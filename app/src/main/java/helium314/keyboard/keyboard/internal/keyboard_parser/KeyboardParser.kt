@@ -196,6 +196,16 @@ class KeyboardParser(private val params: KeyboardParams, private val context: Co
                 totalWidth = allKeys.sumOf { it.mWidth }
             }
 
+            // Façon Fleksy : sur les claviers de lettres et de symboles, les touches d'une rangée trop courte
+            // sont élargies pour occuper toute la largeur de l'écran (pas d'espaces vides sur les côtés)
+            val normalKeysWidth = keys.sumOf { it.mWidth }
+            if (totalWidth < 0.9999f && params.mId.element.isAlphaOrSymbol && normalKeysWidth > 0f) {
+                val scaleFactor = (normalKeysWidth + 1f - totalWidth) / normalKeysWidth
+                keys.forEach { it.mWidth *= scaleFactor }
+                keysInRows.add(ArrayList(allKeys))
+                return@forEachIndexed
+            }
+
             // re-scale total width, or add spacers (or do nothing if totalWidth is near 1)
             if (totalWidth < 0.9999f) { // add spacers
                 val spacerWidth = (1f - totalWidth) / 2

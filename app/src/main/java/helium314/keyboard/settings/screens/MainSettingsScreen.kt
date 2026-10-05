@@ -77,6 +77,12 @@ fun MainSettingsScreen(
                     icon = R.drawable.ic_settings_toolbar
                 ) { NextScreenIcon() }
                 Preference(
+                    name = "Couleurs du clavier",
+                    description = "Teinte du clavier et de la rangée du milieu (style Fleksy)",
+                    onClick = { SettingsDestination.navigateTo(SettingsDestination.FleksyColors) },
+                    icon = R.drawable.ic_settings_appearance
+                ) { NextScreenIcon() }
+                Preference(
                     name = "Raccourcis texte",
                     description = "Textes insérés depuis la barre d'outils (adresse e-mail…)",
                     onClick = { SettingsDestination.navigateTo(SettingsDestination.FleksyShortcuts) },

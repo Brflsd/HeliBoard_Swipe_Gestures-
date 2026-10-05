@@ -194,6 +194,7 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         }
 
         updateKeys()
+        FleksyCorrectionDisplay.onChange = { FleksyCorrectionDisplay.state?.let { renderFleksyCorrection(it) } }
     }
 
     private lateinit var listener: Listener
@@ -270,6 +271,12 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
     }
 
     fun setSuggestions(suggestions: SuggestedWords, isRtlLanguage: Boolean) {
+        // correction façon Fleksy en cours : on garde son affichage tant que l'utilisateur n'a pas retapé
+        FleksyCorrectionDisplay.state?.let {
+            setRtl(isRtlLanguage)
+            renderFleksyCorrection(it)
+            return
+        }
         clear()
         setRtl(isRtlLanguage)
         suggestedWords = suggestions
@@ -400,6 +407,44 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         showFleksyPage(pages[Math.floorMod(index + step, pages.size)])
         AudioAndHapticFeedbackManager.getInstance().performHapticAndAudioFeedback(KeyCode.NOT_SPECIFIED, this, HapticEvent.KEY_PRESS)
         return true
+    }
+
+    /** [livre ou mot du haut]  mot actuel  [mot du bas] — façon Fleksy */
+    private fun renderFleksyCorrection(state: FleksyCorrectionDisplay.State) {
+        clear()
+        suggestedWords = SuggestedWords.getEmptyInstance()
+        setToolbarVisibilityInternal(false)
+        val colors = Settings.getValues().mColors
+
+        fun slot(text: String?, color: Int, bold: Boolean, onTap: (() -> Unit)?): TextView {
+            val view = TextView(context, null, R.attr.suggestionWordStyle)
+            view.text = text ?: ""
+            view.gravity = android.view.Gravity.CENTER
+            view.maxLines = 1
+            view.ellipsize = TextUtils.TruncateAt.END
+            view.setTextColor(color)
+            if (bold) view.setTypeface(view.typeface, android.graphics.Typeface.BOLD)
+            colors.setBackground(view, ColorType.STRIP_BACKGROUND)
+            view.layoutParams = LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 1f)
+            if (onTap != null && text != null) view.setOnClickListener { onTap() }
+            return view
+        }
+
+        val left: View = if (state.upAddsToDictionary || state.justAdded) {
+            ImageButton(context, null, R.attr.suggestionWordStyle).apply {
+                setImageResource(if (state.justAdded) R.drawable.ic_setup_check else R.drawable.ic_fleksy_add_word)
+                colors.setColor(this, ColorType.TOOL_BAR_KEY)
+                colors.setBackground(this, ColorType.STRIP_BACKGROUND)
+                contentDescription = "Ajouter au dictionnaire personnel"
+                layoutParams = LinearLayout.LayoutParams(0, LayoutParams.MATCH_PARENT, 1f)
+                if (!state.justAdded) setOnClickListener { FleksyCorrectionDisplay.onTapPrevious?.invoke() }
+            }
+        } else slot(state.previous, colors.get(ColorType.SUGGESTED_WORD), false) { FleksyCorrectionDisplay.onTapPrevious?.invoke() }
+
+        suggestionsStrip.addView(left)
+        suggestionsStrip.addView(slot(state.current, colors.get(ColorType.SUGGESTION_AUTO_CORRECT), true, null))
+        suggestionsStrip.addView(slot(state.next, colors.get(ColorType.SUGGESTED_WORD), false) { FleksyCorrectionDisplay.onTapNext?.invoke() })
+        suggestionsStrip.isVisible = true
     }
 
     private fun showFleksyPage(page: FleksyToolbarPage) {

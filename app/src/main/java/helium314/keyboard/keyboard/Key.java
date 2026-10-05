@@ -844,6 +844,11 @@ public class Key implements Comparable<Key> {
         mPressed = false;
     }
 
+    /** Couleurs Fleksy : le fond de la touche n'est dessiné que pendant l'appui. */
+    public boolean isPressedForFleksy() {
+        return mPressed;
+    }
+
     public final boolean isEnabled() {
         return mEnabled;
     }

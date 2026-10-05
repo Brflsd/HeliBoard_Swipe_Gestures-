@@ -300,6 +300,7 @@ public class KeyboardView extends View {
                 canvas.drawColor(Color.BLACK, PorterDuff.Mode.CLEAR);
                 background.draw(canvas);
             }
+            drawFleksyRowBands(canvas, keyboard);
             // Draw all keys.
             for (final Key key : keyboard.getSortedKeys()) {
                 onDrawKey(key, canvas, paint);
@@ -318,6 +319,7 @@ public class KeyboardView extends View {
                     canvas.clipRect(mClipRect);
                     canvas.drawColor(Color.BLACK, PorterDuff.Mode.CLEAR);
                     background.draw(canvas);
+                    drawFleksyRowBands(canvas, keyboard);
                     canvas.restore();
                 }
                 onDrawKey(key, canvas, paint);
@@ -339,7 +341,7 @@ public class KeyboardView extends View {
         final KeyDrawParams params = mKeyDrawParams.mayCloneAndUpdateParams((int) (key.getHeight() * mKeyScaleForText), attr);
         params.mAnimAlpha = Constants.Color.ALPHA_OPAQUE;
 
-        if (!key.isSpacer()) {
+        if (!key.isSpacer() && !skipFleksyKeyBackground(key)) {
             final Drawable background = key.selectBackgroundDrawable(
                     mKeyBackground, mFunctionalKeyBackground, mSpacebarBackground, mActionKeyBackground);
             onDrawKeyBackground(key, canvas, background);
@@ -347,6 +349,40 @@ public class KeyboardView extends View {
         onDrawKeyTopVisuals(key, canvas, paint, params);
 
         canvas.translate(-keyDrawX, -keyDrawY);
+    }
+
+    // --- Couleurs Fleksy : rangées en bandes horizontales ---
+    @Nullable private int[] mFleksyRowColors;
+    private final Paint mFleksyBandPaint = new Paint();
+
+    /** Dessine une bande de couleur par rangée (clavier de lettres uniquement), si le style est activé. */
+    private void drawFleksyRowBands(@NonNull final Canvas canvas, @NonNull final Keyboard keyboard) {
+        mFleksyRowColors = null;
+        if (!(this instanceof MainKeyboardView) || !keyboard.mId.getElement().isAlphabet()) return;
+        final int[] colors = FleksyColors.rowColors(getContext());
+        if (colors == null) return;
+        mFleksyRowColors = colors;
+        final java.util.TreeSet<Integer> rowTops = new java.util.TreeSet<>();
+        for (final Key key : keyboard.getSortedKeys()) {
+            if (!key.isSpacer()) rowTops.add(key.getY());
+        }
+        final Integer[] rows = rowTops.toArray(new Integer[0]);
+        final int firstLetterRow = keyboard.mId.getNumberRowEnabled() ? 1 : 0;
+        final int halfGap = keyboard.mVerticalGap / 2;
+        for (int i = 0; i < rows.length; i++) {
+            final int top = i == 0 ? 0 : rows[i] + getPaddingTop() - halfGap;
+            final int bottom = i == rows.length - 1 ? getHeight() : rows[i + 1] + getPaddingTop() - halfGap;
+            final int letterRow = i - firstLetterRow;
+            mFleksyBandPaint.setColor(letterRow == 1 ? colors[1] : letterRow >= 2 ? colors[2] : colors[0]);
+            canvas.drawRect(0, top, getWidth(), bottom, mFleksyBandPaint);
+        }
+    }
+
+    /** Avec les bandes, les touches de lettres et Maj/effacer n'ont pas de fond, sauf pendant l'appui. */
+    private boolean skipFleksyKeyBackground(@NonNull final Key key) {
+        if (mFleksyRowColors == null || key.isPressedForFleksy()) return false;
+        final int type = key.getBackgroundType();
+        return type == Key.BACKGROUND_TYPE_NORMAL || type == Key.BACKGROUND_TYPE_FUNCTIONAL;
     }
 
     // Draw key background.

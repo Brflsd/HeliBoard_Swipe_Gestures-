@@ -772,6 +772,28 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
                 && mKeyboard.mId.getElement().isAlphabet() && !sInGesture;
     }
 
+    /** Façon Fleksy : pendant un appui long, le doigt peut glisser n'importe où (même sur d'autres lettres),
+     *  c'est toujours la variante la plus proche du panneau qui est choisie. */
+    private static int clampToPopupX(final PopupKeysPanel panel, final int x) {
+        if (!(panel instanceof PopupKeysKeyboardView)) return x;
+        final PopupKeysKeyboardView view = (PopupKeysKeyboardView) panel;
+        final Keyboard keyboard = view.getKeyboard();
+        if (keyboard == null) return x;
+        final int min = view.getPaddingLeft();
+        final int max = min + keyboard.mOccupiedWidth - 1;
+        return Math.max(min, Math.min(x, max));
+    }
+
+    private static int clampToPopupY(final PopupKeysPanel panel, final int y) {
+        if (!(panel instanceof PopupKeysKeyboardView)) return y;
+        final PopupKeysKeyboardView view = (PopupKeysKeyboardView) panel;
+        final Keyboard keyboard = view.getKeyboard();
+        if (keyboard == null) return y;
+        final int min = view.getPaddingTop();
+        final int max = min + keyboard.mOccupiedHeight - 1;
+        return Math.max(min, Math.min(y, max));
+    }
+
     /** Glissement vers la droite depuis Maj : ouvre les emojis. Renvoie true si le mouvement est absorbé. */
     private boolean handleShiftSwipeMove(final int x, final int y) {
         if (!mShiftSwipeCandidate) return false;
@@ -948,8 +970,8 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
         }
 
         if (isShowingPopupKeysPanel()) {
-            final int translatedX = mPopupKeysPanel.translateX(x);
-            final int translatedY = mPopupKeysPanel.translateY(y);
+            final int translatedX = clampToPopupX(mPopupKeysPanel, mPopupKeysPanel.translateX(x));
+            final int translatedY = clampToPopupY(mPopupKeysPanel, mPopupKeysPanel.translateY(y));
             mPopupKeysPanel.onMoveEvent(translatedX, translatedY, mPointerId, eventTime);
             onMoveKey(x, y);
             if (mIsInSlidingKeyInput) {
@@ -1226,8 +1248,8 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
                 // To prevent the duplicate input, we set mPopupKeysPanel null before calling onUpEvent, so isShowingPopupKeysPanel returns false
                 PopupKeysPanel panel = mPopupKeysPanel;
                 mPopupKeysPanel = null;
-                int translatedX = panel.translateX(x);
-                int translatedY = panel.translateY(y);
+                int translatedX = clampToPopupX(panel, panel.translateX(x));
+                int translatedY = clampToPopupY(panel, panel.translateY(y));
                 panel.onUpEvent(translatedX, translatedY, mPointerId, eventTime);
                 panel.dismissPopupKeysPanel();
             }

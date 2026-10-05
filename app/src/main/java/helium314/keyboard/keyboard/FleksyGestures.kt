@@ -8,6 +8,7 @@ import helium314.keyboard.latin.SuggestedWords
 import helium314.keyboard.latin.common.Constants
 import helium314.keyboard.latin.RichInputMethodManager
 import helium314.keyboard.latin.inputlogic.InputLogic
+import helium314.keyboard.latin.suggestions.FleksyCorrectionDisplay
 import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.utils.prefs
 import android.provider.UserDictionary
@@ -39,6 +40,14 @@ class FleksyGestures(
     private var candidateIndex = 0
     /** texte exact que le cycle a laissé juste avant le curseur (mot, éventuellement suivi d'un espace) */
     private var insertedText: String? = null
+    /** true si le mot tapé vient d'être ajouté au dictionnaire personnel */
+    private var addedToDictionary = false
+
+    init {
+        // toucher le mot de gauche / droite de la barre = glisser vers le haut / le bas
+        FleksyCorrectionDisplay.onTapPrevious = { cycleSuggestion(-1); haptic() }
+        FleksyCorrectionDisplay.onTapNext = { cycleSuggestion(+1); haptic() }
+    }
 
     fun onSwipe(direction: Int) {
         when (direction) {
@@ -87,6 +96,7 @@ class FleksyGestures(
         candidates = list
         candidateIndex = list.indexOf(committed)
         insertedText = "$committed "
+        publishDisplay()
     }
 
     class PendingCommit(val typed: String, val candidates: List<String>)
@@ -123,7 +133,11 @@ class FleksyGestures(
 
         if (step < 0 && candidateIndex == TYPED_WORD_INDEX) {
             // le mot tapé est déjà affiché : un nouveau glissement vers le haut l'ajoute au dictionnaire
-            addToPersonalDictionary(candidates[TYPED_WORD_INDEX])
+            if (!addedToDictionary) {
+                addToPersonalDictionary(candidates[TYPED_WORD_INDEX])
+                addedToDictionary = true
+                publishDisplay()
+            }
             return
         }
         if (candidates.size < 2) return
@@ -138,6 +152,22 @@ class FleksyGestures(
         connection.commitText(replacement, 1)
         connection.endBatchEdit()
         insertedText = replacement
+        publishDisplay()
+    }
+
+    /** Met à jour la barre : [vers le haut] mot actuel [vers le bas]. */
+    private fun publishDisplay() {
+        if (candidates.isEmpty()) return
+        val onTypedWord = candidateIndex == TYPED_WORD_INDEX
+        FleksyCorrectionDisplay.show(
+            FleksyCorrectionDisplay.State(
+                previous = if (onTypedWord) null else candidates[candidateIndex - 1],
+                upAddsToDictionary = onTypedWord && !addedToDictionary,
+                justAdded = onTypedWord && addedToDictionary,
+                current = candidates[candidateIndex],
+                next = if (candidates.size > 1) candidates[(candidateIndex + 1) % candidates.size] else null,
+            )
+        )
     }
 
     private fun addToPersonalDictionary(word: String) {
@@ -179,6 +209,8 @@ class FleksyGestures(
         candidates = emptyList()
         candidateIndex = 0
         insertedText = null
+        addedToDictionary = false
+        FleksyCorrectionDisplay.clear()
     }
 
     // ------------------------------------------------------------------
