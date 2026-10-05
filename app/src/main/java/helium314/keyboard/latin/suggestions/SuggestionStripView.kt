@@ -81,6 +81,10 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         fun removeSuggestion(word: String?)
         fun removeExternalSuggestions()
         fun onSwipeDownOnToolbar()
+        /** insère un texte (raccourcis texte de la barre d'outils) */
+        fun onTextInput(rawText: String?)
+        /** ouvre les réglages sur l'écran donné (voir SettingsDestination) */
+        fun openSettingsAt(destination: String)
     }
 
     private val moreSuggestionsContainer: View
@@ -119,6 +123,10 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
     private val pinnedKeys: ViewGroup = findViewById(R.id.pinned_keys)
     private val suggestionsStrip: ViewGroup = findViewById(R.id.suggestions_strip)
     private val toolbarExpandKey = findViewById<ImageButton>(R.id.suggestions_strip_toolbar_key)
+    // Pages façon Fleksy (chiffres, raccourcis, disposition), parcourues en glissant sur la barre
+    private val fleksyPageContainer: ViewGroup = findViewById(R.id.fleksy_toolbar_page)
+    private var fleksyPage = FleksyToolbarPage.SUGGESTIONS
+    private val isToolbarShown get() = toolbarContainer.isVisible || fleksyPageContainer.isVisible
     private val incognitoIcon = KeyboardIconsSet.instance.getNewDrawable(ToolbarKey.INCOGNITO.name, context)
     private val toolbarArrowIcon = KeyboardIconsSet.instance.getNewDrawable(KeyboardIconsSet.NAME_TOOLBAR_KEY, context)
     private val defaultToolbarBackground: Drawable = toolbarExpandKey.background
@@ -180,6 +188,14 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
     }
 
     private lateinit var listener: Listener
+    private val fleksyPages by lazy {
+        FleksyToolbarPages(
+            context, fleksyPageContainer, Settings.getValues().mColors,
+            listener = { listener },
+            haptic = { AudioAndHapticFeedbackManager.getInstance().performHapticAndAudioFeedback(KeyCode.NOT_SPECIFIED, this, HapticEvent.KEY_PRESS) },
+            selectedBackground = { enabledToolKeyBackground.constantState?.newDrawable(resources) },
+        )
+    }
     private var suggestedWords = SuggestedWords.getEmptyInstance()
     private var startIndexOfMoreSuggestions = 0
     private var isExternalSuggestionVisible = false // Required to disable the more suggestions if other suggestions are visible
@@ -196,7 +212,7 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
                     return true
                 }
 
-                return if (!isExternalSuggestionVisible && toolbarContainer.visibility != VISIBLE && deltaY > 0 && dy < (-10).dpToPx(resources)) showMoreSuggestions()
+                return if (!isExternalSuggestionVisible && !isToolbarShown && deltaY > 0 && dy < (-10).dpToPx(resources)) showMoreSuggestions()
                 else false
             }
         }
@@ -221,16 +237,24 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         else {
             newLayoutDirection = if (isRtlLanguage) LAYOUT_DIRECTION_RTL else LAYOUT_DIRECTION_LTR
             direction = if (isRtlLanguage) -1 else 1
-            toolbarExpandKey.scaleX = (if (toolbarContainer.visibility != VISIBLE) 1f else -1f) * direction
+            toolbarExpandKey.scaleX = (if (!isToolbarShown) 1f else -1f) * direction
         }
         layoutDirection = newLayoutDirection
         suggestionsStrip.layoutDirection = newLayoutDirection
     }
 
     fun setToolbarVisibility(toolbarVisible: Boolean) {
+        // déjà sur une page Fleksy (chiffres, raccourcis…) : on y reste
+        if (toolbarVisible && fleksyPageContainer.isVisible) return
+        setToolbarVisibilityInternal(toolbarVisible)
+    }
+
+    private fun setToolbarVisibilityInternal(toolbarVisible: Boolean) {
         pinnedKeys.isVisible = !toolbarVisible
         suggestionsStrip.isVisible = !toolbarVisible
         toolbarContainer.isVisible = toolbarVisible
+        fleksyPageContainer.isVisible = false
+        fleksyPage = if (toolbarVisible) FleksyToolbarPage.EDIT else FleksyToolbarPage.SUGGESTIONS
 
         if (DEBUG_SUGGESTIONS) {
             for (view in debugInfoViews) {
@@ -317,6 +341,77 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         return true
     }
 
+    // --- Glissement horizontal sur la barre : page suivante / précédente (façon Fleksy) ---
+    private var pageSwipeDownX = 0f
+    private var pageSwipeDownY = 0f
+    private var pageSwipeTracking = false
+    private var toolbarCouldScrollBack = false
+    private var toolbarCouldScrollForward = false
+
+    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        when (ev.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                pageSwipeDownX = ev.x
+                pageSwipeDownY = ev.y
+                pageSwipeTracking = !isShowingMoreSuggestionPanel && !isExternalSuggestionVisible
+                // si les touches de la page « Édition » défilent, on laisse d'abord défiler jusqu'au bout
+                val scrolls = toolbarContainer.isVisible
+                toolbarCouldScrollBack = scrolls && toolbarContainer.canScrollHorizontally(-1)
+                toolbarCouldScrollForward = scrolls && toolbarContainer.canScrollHorizontally(1)
+            }
+            MotionEvent.ACTION_POINTER_DOWN, MotionEvent.ACTION_CANCEL -> pageSwipeTracking = false
+            MotionEvent.ACTION_UP -> if (pageSwipeTracking) {
+                pageSwipeTracking = false
+                val dx = ev.x - pageSwipeDownX
+                val dy = ev.y - pageSwipeDownY
+                if (abs(dx) > PAGE_SWIPE_MIN_DISTANCE_DP.dpToPx(resources) && abs(dx) > 2 * abs(dy)) {
+                    val forward = (dx < 0) == (layoutDirection != LAYOUT_DIRECTION_RTL) // doigt vers la gauche : page suivante
+                    val blockedByScroll = if (dx < 0) toolbarCouldScrollForward else toolbarCouldScrollBack
+                    if (!blockedByScroll && switchFleksyPage(if (forward) 1 else -1)) {
+                        // annule le toucher pour les boutons de la barre (pas de clic involontaire)
+                        val cancel = MotionEvent.obtain(ev)
+                        cancel.action = MotionEvent.ACTION_CANCEL
+                        super.dispatchTouchEvent(cancel)
+                        cancel.recycle()
+                        return true
+                    }
+                }
+            }
+        }
+        return super.dispatchTouchEvent(ev)
+    }
+
+    private fun availableFleksyPages(): List<FleksyToolbarPage> {
+        val mode = Settings.getValues().mToolbarMode
+        if (mode == ToolbarMode.HIDDEN) return emptyList()
+        return if (mode == ToolbarMode.EXPANDABLE) FleksyToolbarPage.entries
+        else FleksyToolbarPage.entries - FleksyToolbarPage.SUGGESTIONS
+    }
+
+    /** @return true si la page a changé */
+    private fun switchFleksyPage(step: Int): Boolean {
+        val pages = availableFleksyPages()
+        if (pages.size < 2) return false
+        val index = pages.indexOf(fleksyPage).coerceAtLeast(0)
+        showFleksyPage(pages[Math.floorMod(index + step, pages.size)])
+        AudioAndHapticFeedbackManager.getInstance().performHapticAndAudioFeedback(KeyCode.NOT_SPECIFIED, this, HapticEvent.KEY_PRESS)
+        return true
+    }
+
+    private fun showFleksyPage(page: FleksyToolbarPage) {
+        when (page) {
+            FleksyToolbarPage.SUGGESTIONS -> setToolbarVisibilityInternal(false)
+            FleksyToolbarPage.EDIT -> setToolbarVisibilityInternal(true)
+            else -> {
+                setToolbarVisibilityInternal(true)
+                toolbarContainer.isVisible = false
+                fleksyPages.show(page)
+                fleksyPageContainer.isVisible = true
+            }
+        }
+        fleksyPage = page
+    }
+
     override fun onInterceptTouchEvent(motionEvent: MotionEvent): Boolean {
         // Detecting sliding up finger to show MoreSuggestionsView.
         return moreSuggestionsView.shouldInterceptTouchEvent(motionEvent)
@@ -336,7 +431,7 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         }
         AudioAndHapticFeedbackManager.getInstance().performHapticAndAudioFeedback(KeyCode.NOT_SPECIFIED, this, HapticEvent.KEY_PRESS)
         if (view === toolbarExpandKey) {
-            setToolbarVisibility(toolbarContainer.visibility != VISIBLE)
+            setToolbarVisibility(!isToolbarShown)
         }
 
         // tag for word views is set in SuggestionStripLayoutHelper (setupWordViewsTextAndColor, layoutPunctuationSuggestions)
@@ -483,7 +578,7 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
     private fun clear() {
         suggestionsStrip.removeAllViews()
         if (DEBUG_SUGGESTIONS) removeAllDebugInfoViews()
-        if (!toolbarContainer.isVisible)
+        if (!isToolbarShown)
             suggestionsStrip.isVisible = true
         dismissMoreSuggestionsPanel()
         for (word in wordViews) {
@@ -552,6 +647,7 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         @JvmField
         var DEBUG_SUGGESTIONS = false
         private const val DEBUG_INFO_TEXT_SIZE_IN_DIP = 6.5f
+        private const val PAGE_SWIPE_MIN_DISTANCE_DP = 50
         private val TAG = SuggestionStripView::class.java.simpleName
     }
 }

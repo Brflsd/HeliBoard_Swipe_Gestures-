@@ -41,6 +41,14 @@
                 style="?attr/suggestionWordStyle">
             </LinearLayout>
         </HorizontalScrollView>
+        <!-- Pages supplémentaires de la barre d'outils (chiffres, raccourcis, disposition),
+             atteintes en glissant horizontalement sur la barre -->
+        <LinearLayout
+            android:id="@+id/fleksy_toolbar_page"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="horizontal"
+            android:visibility="gone" />
         <!-- Provide audio and haptic feedback by ourselves based on the keyboard settings.
              We just need to ignore the system's audio and haptic feedback settings. -->
         <!-- todo: sth is fishy with that maxwidth

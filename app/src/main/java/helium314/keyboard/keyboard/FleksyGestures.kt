@@ -6,15 +6,20 @@ import androidx.core.content.edit
 import helium314.keyboard.keyboard.internal.keyboard_parser.floris.KeyCode
 import helium314.keyboard.latin.SuggestedWords
 import helium314.keyboard.latin.common.Constants
+import helium314.keyboard.latin.RichInputMethodManager
 import helium314.keyboard.latin.inputlogic.InputLogic
+import helium314.keyboard.latin.settings.Settings
 import helium314.keyboard.latin.utils.prefs
+import android.provider.UserDictionary
 import java.text.BreakIterator
+import kotlin.concurrent.thread
 
 /**
  * Gestes façon Fleksy, déclenchés par un glissement qui part d'une touche de caractère :
  *  - droite : espace (deux fois de suite : point, grâce au « double espace = point » de HeliBoard)
  *  - gauche : effacer le mot précédent
- *  - bas / haut : suggestion suivante / précédente pour le dernier mot
+ *  - bas / haut : suggestion suivante / précédente pour le dernier mot ;
+ *    tout en haut se trouve le mot tapé (annule la correction), un haut de plus l'ajoute au dictionnaire
  *  - deux pouces vers le bas / le haut : cacher / afficher la rangée de la barre d'espace
  */
 class FleksyGestures(
@@ -64,16 +69,15 @@ class FleksyGestures(
         if (code != Constants.CODE_SPACE || !inputLogic.isComposingWordForFleksy) return null
         val typed = inputLogic.typedWordForFleksy
         if (typed.isEmpty()) return null
-        return PendingCommit(typed, collectCandidates(typed))
+        return PendingCommit(typed, collectCandidates(typed, refreshIfStale = true))
     }
 
     /** À appeler juste après le traitement d'un espace qui a validé un mot. */
     fun afterCodeInput(pending: PendingCommit?) {
         if (pending == null) return
-        // après la validation, la liste des suggestions est souvent plus à jour : on la préfère si elle correspond
-        val fresh = collectCandidates(pending.typed)
-        val list = if (fresh.size > 1) fresh else pending.candidates
-        if (list.size < 2) return
+        // après la validation, la liste des suggestions est parfois plus complète : on la préfère si elle correspond
+        val fresh = collectCandidates(pending.typed, refreshIfStale = false)
+        val list = if (fresh.size > pending.candidates.size) fresh else pending.candidates
         val maxLength = list.maxOf { it.length }
         val before = connection.getTextBeforeCursor(maxLength + 2, 0)?.toString() ?: return
         if (!before.endsWith(" ")) return
@@ -88,7 +92,10 @@ class FleksyGestures(
     class PendingCommit(val typed: String, val candidates: List<String>)
 
     // ------------------------------------------------------------------
-    // Haut / bas : faire défiler les suggestions
+    // Haut / bas : naviguer dans la correction automatique
+    //  - bas : suggestion suivante
+    //  - haut : suggestion précédente ; on finit sur le mot tapé tel quel (annule la correction)
+    //  - haut alors que le mot tapé est affiché : ajout au dictionnaire personnel
     // ------------------------------------------------------------------
 
     private fun cycleSuggestion(step: Int) {
@@ -103,19 +110,28 @@ class FleksyGestures(
             // pas de mot validé récemment : on travaille sur le mot en cours de saisie
             if (!inputLogic.isComposingWordForFleksy) return
             val typed = inputLogic.typedWordForFleksy
-            val list = collectCandidates(typed)
-            if (list.size < 2) return
+            if (typed.isEmpty()) return
+            val list = collectCandidates(typed, refreshIfStale = true)
             inputLogic.finishInput() // fige le mot tel qu'il a été tapé
             if (connection.getTextBeforeCursor(typed.length, 0)?.toString() != typed) return
             candidates = list
-            candidateIndex = list.indexOf(typed).coerceAtLeast(0)
+            candidateIndex = TYPED_WORD_INDEX
             current = typed
+            insertedText = typed
+        }
+        if (candidates.isEmpty()) return
+
+        if (step < 0 && candidateIndex == TYPED_WORD_INDEX) {
+            // le mot tapé est déjà affiché : un nouveau glissement vers le haut l'ajoute au dictionnaire
+            addToPersonalDictionary(candidates[TYPED_WORD_INDEX])
+            return
         }
         if (candidates.size < 2) return
 
         candidateIndex = Math.floorMod(candidateIndex + step, candidates.size)
         val word = candidates[candidateIndex]
         val replacement = if (current.endsWith(" ")) "$word " else word
+        if (replacement == current) return
         inputLogic.finishInput()
         connection.beginBatchEdit()
         connection.deleteTextBeforeCursor(current.length)
@@ -124,19 +140,38 @@ class FleksyGestures(
         insertedText = replacement
     }
 
-    /** Liste des mots à proposer pour le mot tapé, dans l'ordre des suggestions de HeliBoard. */
-    private fun collectCandidates(typed: String): List<String> {
-        val suggestions = inputLogic.mSuggestedWords
+    private fun addToPersonalDictionary(word: String) {
+        val trimmed = word.trim()
+        if (trimmed.isEmpty()) return
+        val locale = runCatching { RichInputMethodManager.getInstance().currentSubtypeLocale }.getOrNull()
+        thread {
+            // l'ajout peut échouer sur certains appareils sans dictionnaire personnel système
+            runCatching { UserDictionary.Words.addWord(context, trimmed, 250, null, locale) }
+        }
+        KeyboardSwitcher.getInstance().showToast("« $trimmed » ajouté au dictionnaire personnel", true)
+    }
+
+    /**
+     * Liste des mots à proposer pour le mot tapé : le mot tapé en premier, puis les suggestions
+     * de HeliBoard dans leur ordre (la correction automatique est la première d'entre elles).
+     */
+    private fun collectCandidates(typed: String, refreshIfStale: Boolean): List<String> {
+        var suggestions = inputLogic.mSuggestedWords
+        if (refreshIfStale && suggestions.mTypedWordInfo?.mWord != typed && inputLogic.isComposingWordForFleksy) {
+            // les suggestions sont calculées en arrière-plan ; si on va plus vite qu'elles, on les calcule tout de suite
+            inputLogic.performUpdateSuggestionStripSync(Settings.getValues(), SuggestedWords.INPUT_STYLE_TYPING)
+            suggestions = inputLogic.mSuggestedWords
+        }
         if (suggestions.isPunctuationSuggestions || suggestions.mTypedWordInfo?.mWord != typed)
             return listOf(typed) // suggestions périmées ou absentes
         val words = LinkedHashSet<String>()
+        words.add(typed)
         for (i in 0 until suggestions.size()) {
             val info = suggestions.getInfo(i)
             if (info.isKindOf(SuggestedWords.SuggestedWordInfo.KIND_PREDICTION)) continue
             if (info.mWord.isNotEmpty()) words.add(info.mWord)
             if (words.size >= MAX_CANDIDATES) break
         }
-        if (typed !in words) return listOf(typed) + words.take(MAX_CANDIDATES - 1)
         return words.toList()
     }
 
@@ -168,6 +203,7 @@ class FleksyGestures(
 
     companion object {
         private const val MAX_CANDIDATES = 8
+        private const val TYPED_WORD_INDEX = 0
         private const val MAX_WORD_LOOKBACK = 100
         private const val PREF_HIDE_SPACE_ROW = "fleksy_hide_space_row"
 

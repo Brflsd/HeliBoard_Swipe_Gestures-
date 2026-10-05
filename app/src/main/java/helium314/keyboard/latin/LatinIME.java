@@ -91,6 +91,7 @@ import helium314.keyboard.latin.utils.SubtypeSettings;
 import helium314.keyboard.latin.utils.SubtypeState;
 import helium314.keyboard.latin.utils.ToolbarMode;
 import helium314.keyboard.settings.SettingsActivity2;
+import helium314.keyboard.settings.SettingsDestination;
 import kotlin.Unit;
 
 import java.io.FileDescriptor;
@@ -1732,6 +1733,13 @@ public class LatinIME extends InputMethodService implements
 
     public ClipboardHistoryManager getClipboardHistoryManager() {
         return mClipboardHistoryManager;
+    }
+
+    /** Gestes Fleksy : ouvre les réglages directement sur un écran donné (raccourcis texte, disposition…). */
+    @Override
+    public void openSettingsAt(@NonNull final String destination) {
+        SettingsDestination.INSTANCE.getNavTarget().setValue(destination);
+        launchSettings();
     }
 
     void launchSettings() {

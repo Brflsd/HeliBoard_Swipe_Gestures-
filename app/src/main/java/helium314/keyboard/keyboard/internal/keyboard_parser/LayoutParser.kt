@@ -95,7 +95,9 @@ object LayoutParser {
         return { params ->
             simpleKeyData.mapIndexedTo(mutableListOf()) { i, row ->
                 val newRow = row.toMutableList()
-                if (params.mId.element.isAlphabet && layoutName.endsWith("+"))
+                // Façon Fleksy : pas de touches supplémentaires pour les lettres accentuées (é, à, ü…)
+                // sur le côté des dispositions « + » ; les accents s'obtiennent par appui long sur la lettre de base.
+                if (FLEKSY_EXTRA_ACCENT_KEYS && params.mId.element.isAlphabet && layoutName.endsWith("+"))
                     params.mLocaleKeyboardInfos.getExtraKeys(i+1)?.let { newRow.addAll(it) }
                 newRow
             }
@@ -180,3 +182,6 @@ object LayoutParser {
         }
     }
 }
+
+/** false : les dispositions « + » n'ajoutent pas de touches accentuées sur le côté. */
+private const val FLEKSY_EXTRA_ACCENT_KEYS = false

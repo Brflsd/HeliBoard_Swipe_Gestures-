@@ -22,6 +22,7 @@ import helium314.keyboard.latin.utils.SubtypeLocaleUtils.displayName
 import helium314.keyboard.latin.utils.SubtypeSettings
 import helium314.keyboard.latin.utils.NextScreenIcon
 import helium314.keyboard.settings.SearchSettingsScreen
+import helium314.keyboard.settings.SettingsDestination
 import helium314.keyboard.latin.utils.Theme
 import helium314.keyboard.settings.initPreview
 import helium314.keyboard.settings.preferences.Preference
@@ -73,6 +74,12 @@ fun MainSettingsScreen(
                 Preference(
                     name = stringResource(R.string.settings_screen_toolbar),
                     onClick = onClickToolbar,
+                    icon = R.drawable.ic_settings_toolbar
+                ) { NextScreenIcon() }
+                Preference(
+                    name = "Raccourcis texte",
+                    description = "Textes insérés depuis la barre d'outils (adresse e-mail…)",
+                    onClick = { SettingsDestination.navigateTo(SettingsDestination.FleksyShortcuts) },
                     icon = R.drawable.ic_settings_toolbar
                 ) { NextScreenIcon() }
                 if (JniUtils.sHaveGestureLib)
