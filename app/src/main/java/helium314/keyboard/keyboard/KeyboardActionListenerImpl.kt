@@ -45,6 +45,20 @@ class KeyboardActionListenerImpl(private val latinIME: LatinIME, private val inp
     private val settings = Settings.getInstance()
     private val audioAndHapticFeedbackManager = AudioAndHapticFeedbackManager.getInstance()
 
+    // gestes façon Fleksy
+    private val fleksyGestures by lazy {
+        FleksyGestures(
+            inputLogic,
+            sendCode = { code -> onCodeInput(code, Constants.NOT_A_COORDINATE, Constants.NOT_A_COORDINATE, false) },
+            haptic = { performHapticFeedback(HapticEvent.GESTURE_MOVE) },
+            reloadKeyboard = {
+                KeyboardLayoutSet.onKeyboardThemeChanged() // vide le cache des dispositions
+                keyboardSwitcher.reloadKeyboard()
+            },
+            context = latinIME,
+        )
+    }
+
     // language slide state
     private var initialSubtype: InputMethodSubtype? = null
     private var subtypeSwitchCount = 0
@@ -103,6 +117,16 @@ class KeyboardActionListenerImpl(private val latinIME: LatinIME, private val inp
     }
 
     override fun onCodeInput(primaryCode: Int, x: Int, y: Int, isKeyRepeat: Boolean) {
+        val pendingFleksyCommit = fleksyGestures.beforeCodeInput(primaryCode)
+        onCodeInputInternal(primaryCode, x, y, isKeyRepeat)
+        fleksyGestures.afterCodeInput(pendingFleksyCommit)
+    }
+
+    override fun onFleksySwipe(direction: Int) = fleksyGestures.onSwipe(direction)
+
+    override fun onFleksyTwoFingerSwipe(direction: Int) = fleksyGestures.onTwoFingerSwipe(direction)
+
+    private fun onCodeInputInternal(primaryCode: Int, x: Int, y: Int, isKeyRepeat: Boolean) {
         when (primaryCode) {
             KeyCode.TOGGLE_AUTOCORRECT -> return settings.toggleAutoCorrect()
             KeyCode.TOGGLE_INCOGNITO_MODE -> {

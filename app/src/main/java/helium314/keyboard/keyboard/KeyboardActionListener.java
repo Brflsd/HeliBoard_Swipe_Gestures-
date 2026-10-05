@@ -125,6 +125,18 @@ public interface KeyboardActionListener {
     void onUpWithDeletePointerActive();
     void resetMetaState();
 
+    // --- Gestes façon Fleksy ---
+    int FLEKSY_SWIPE_RIGHT = 1;
+    int FLEKSY_SWIPE_LEFT = 2;
+    int FLEKSY_SWIPE_UP = 3;
+    int FLEKSY_SWIPE_DOWN = 4;
+
+    /** Glissement d'un doigt sur une touche lettre (droite = espace, gauche = effacer mot, haut/bas = suggestions). */
+    default void onFleksySwipe(int direction) {}
+
+    /** Glissement simultané de deux doigts vers le haut ou le bas (afficher/cacher la rangée de la barre d'espace). */
+    default void onFleksyTwoFingerSwipe(int direction) {}
+
     KeyboardActionListener EMPTY_LISTENER = new Adapter();
 
     enum SwipeAction { NONE, MOVE_CURSOR, SWITCH_LANGUAGE, TOGGLE_NUMPAD, TOGGLE_DPAD, HIDE_KEYBOARD, TOUCHPAD_MODE }

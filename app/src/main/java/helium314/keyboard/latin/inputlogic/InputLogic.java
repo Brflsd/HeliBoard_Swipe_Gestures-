@@ -213,6 +213,15 @@ public final class InputLogic {
         }
     }
 
+    // --- Gestes Fleksy : accès en lecture au mot en cours de saisie ---
+    public boolean isComposingWordForFleksy() {
+        return mWordComposer.isComposingWord();
+    }
+
+    public String getTypedWordForFleksy() {
+        return mWordComposer.getTypedWord();
+    }
+
     /**
      * Clean up the input logic after input is finished.
      */

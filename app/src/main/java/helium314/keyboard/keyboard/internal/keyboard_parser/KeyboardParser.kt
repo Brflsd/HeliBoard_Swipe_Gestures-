@@ -4,6 +4,7 @@ package helium314.keyboard.keyboard.internal.keyboard_parser
 import android.content.Context
 import android.content.res.Configuration
 import helium314.keyboard.latin.utils.Log
+import helium314.keyboard.keyboard.FleksyGestures
 import helium314.keyboard.keyboard.Key
 import helium314.keyboard.keyboard.Key.KeyParams
 import helium314.keyboard.keyboard.KeyboardElement
@@ -87,7 +88,25 @@ class KeyboardParser(private val params: KeyboardParams, private val context: Co
             }
         }
 
+        // Gestes Fleksy : rangée de la barre d'espace cachée avec deux pouces vers le bas
+        if (params.mId.element.isAlphabet && FleksyGestures.isSpaceRowHidden(context))
+            removeSpaceRow(keysInRows)
+
         return keysInRows
+    }
+
+    /** Retire la dernière rangée (barre d'espace) et réduit la hauteur du clavier d'autant,
+     *  les autres rangées gardant exactement leur taille. */
+    private fun removeSpaceRow(keysInRows: ArrayList<ArrayList<KeyParams>>) {
+        if (keysInRows.size < 2) return
+        val bottomFraction = keysInRows.last().maxOfOrNull { it.mHeight } ?: return
+        if (bottomFraction <= 0f || bottomFraction >= 1f) return // hauteur absolue ou inattendue : on ne touche à rien
+        if (keysInRows.dropLast(1).any { row -> row.any { it.mHeight < 0f } }) return
+        keysInRows.removeAt(keysInRows.lastIndex)
+        val removedHeight = (bottomFraction * params.mBaseHeight).roundToInt()
+        params.mBaseHeight -= removedHeight
+        params.mOccupiedHeight -= removedHeight
+        keysInRows.forEach { row -> row.forEach { it.mHeight /= (1f - bottomFraction) } }
     }
 
     private fun createRows(baseKeys: MutableList<MutableList<KeyData>>): ArrayList<ArrayList<KeyParams>> {

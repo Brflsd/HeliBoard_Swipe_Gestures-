@@ -171,6 +171,20 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
     private boolean mKeySwipeAllowed = false;
     private static boolean sInKeySwipe = false;
 
+    // --- Gestes façon Fleksy ---
+    // distance minimale (dp) pour qu'un mouvement soit un geste et non une frappe
+    private static final int sFleksySwipeThreshold = KtxKt.dpToPx(28, Resources.getSystem());
+    // true si ce doigt a commencé sur une touche qui accepte les gestes Fleksy
+    private boolean mFleksyEligible = false;
+    // direction du geste en cours (0 = aucun geste)
+    private int mFleksyDirection = 0;
+    // nombre de doigts en glissement vertical vers le haut / vers le bas (geste à deux pouces)
+    private static int sFleksyVerticalUpCount = 0;
+    private static int sFleksyVerticalDownCount = 0;
+    // direction du geste à deux doigts détecté (0 = aucun), et s'il a déjà été exécuté
+    private static int sFleksyTwoFingerDirection = 0;
+    private static boolean sFleksyTwoFingerHandled = false;
+
     // Touchpad mode for cursor control
     private final TouchpadHandler mTouchpadHandler = new TouchpadHandler();
 
@@ -651,6 +665,8 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
         if (DEBUG_EVENT) {
             printTouchEvent("onDownEvent:", x, y, eventTime);
         }
+        mFleksyEligible = false;
+        mFleksyDirection = 0;
         // Naive up-to-down noise filter.
         final long deltaT = eventTime - mUpTime;
         if (deltaT < sParams.mTouchNoiseThresholdTime) {
@@ -685,7 +701,8 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
         // A gesture should start only from a non-modifier key. Note that the gesture detection is
         // disabled when the key is repeating.
         mIsDetectingGesture = (mKeyboard != null) && mKeyboard.mId.getElement().isAlphabet()
-                && key != null && !key.isModifier() && !mKeySwipeAllowed && !sInKeySwipe;
+                && key != null && !key.isModifier() && !mKeySwipeAllowed && !sInKeySwipe
+                && !mFleksyEligible;
         if (mIsDetectingGesture) {
             mBatchInputArbiter.addDownEventPoint(x, y, eventTime,
                     sTypingTimeRecorder.getLastLetterTypingTime(), getActivePointerTrackerCount());
@@ -740,6 +757,83 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
             mStartY = y;
             mStartTime = SystemClock.elapsedRealtime();
         }
+        // Gestes Fleksy : premier doigt posé -> on remet à zéro l'état du geste à deux doigts
+        if (getActivePointerTrackerCount() <= 1) {
+            sFleksyVerticalUpCount = 0;
+            sFleksyVerticalDownCount = 0;
+            sFleksyTwoFingerDirection = 0;
+            sFleksyTwoFingerHandled = false;
+        }
+        mFleksyEligible = isFleksyEligible(key);
+    }
+
+    /** Les gestes Fleksy partent des touches de caractères (lettres, chiffres, ponctuation),
+     *  jamais de la barre d'espace, d'effacer, de Maj ou des autres touches de fonction. */
+    private boolean isFleksyEligible(@Nullable final Key key) {
+        if (key == null || mKeyboard == null || sInGesture) return false;
+        if (key.isModifier() || isSwiper(key.getCode())) return false;
+        if (!mKeyboard.mId.getElement().isAlphaOrSymbol()) return false;
+        final int code = key.getCode();
+        // codes > 32 : caractères imprimables (exclut espace, entrée, tabulation et les codes négatifs des touches de fonction)
+        return code > Constants.CODE_SPACE || (code == KeyCode.MULTIPLE_CODE_POINTS && key.getOutputText() != null);
+    }
+
+    /** Direction du geste selon le déplacement depuis le point de départ, ou 0 si le mouvement est trop court. */
+    private static int fleksyDirectionFor(final int dX, final int dY) {
+        if (Math.max(abs(dX), abs(dY)) < sFleksySwipeThreshold) return 0;
+        if (abs(dX) >= abs(dY))
+            return dX > 0 ? KeyboardActionListener.FLEKSY_SWIPE_RIGHT : KeyboardActionListener.FLEKSY_SWIPE_LEFT;
+        return dY > 0 ? KeyboardActionListener.FLEKSY_SWIPE_DOWN : KeyboardActionListener.FLEKSY_SWIPE_UP;
+    }
+
+    private static boolean isVerticalFleksyDirection(final int direction) {
+        return direction == KeyboardActionListener.FLEKSY_SWIPE_UP || direction == KeyboardActionListener.FLEKSY_SWIPE_DOWN;
+    }
+
+    /** Le doigt a dépassé le seuil : on abandonne la frappe de la touche et on passe en mode geste. */
+    private void startFleksySwipe(final int direction) {
+        mFleksyDirection = direction;
+        sTimerProxy.cancelKeyTimersOf(this); // pas d'appui long pendant un geste
+        mIsDetectingGesture = false;
+        final Key key = mCurrentKey;
+        if (key != null) {
+            setReleasedKeyGraphics(key, false);
+            sListener.onReleaseKey(key.getCode(), false);
+        }
+        registerFleksyVerticalSwipe(direction);
+    }
+
+    /** Compte les doigts qui glissent verticalement, pour reconnaître le geste à deux pouces. */
+    private void registerFleksyVerticalSwipe(final int direction) {
+        if (!isVerticalFleksyDirection(direction)) return;
+        if (direction == KeyboardActionListener.FLEKSY_SWIPE_UP) sFleksyVerticalUpCount++;
+        else sFleksyVerticalDownCount++;
+        if (sFleksyVerticalUpCount >= 2) sFleksyTwoFingerDirection = KeyboardActionListener.FLEKSY_SWIPE_UP;
+        else if (sFleksyVerticalDownCount >= 2) sFleksyTwoFingerDirection = KeyboardActionListener.FLEKSY_SWIPE_DOWN;
+    }
+
+    /** Appelé au relâchement du doigt. Renvoie true si un geste Fleksy a été traité (la touche ne doit alors pas être tapée). */
+    private boolean handleFleksySwipeOnUp(final int x, final int y) {
+        if (!mFleksyEligible) return false;
+        mFleksyEligible = false;
+        int direction = mFleksyDirection;
+        mFleksyDirection = 0;
+        if (mIsTrackingForActionDisabled) return direction != 0;
+        if (direction == 0) {
+            // geste très rapide : aucun événement de mouvement n'a dépassé le seuil avant le relâchement
+            direction = fleksyDirectionFor(x - mStartX, y - mStartY);
+            if (direction == 0) return false; // simple frappe
+            registerFleksyVerticalSwipe(direction);
+        }
+        if (isVerticalFleksyDirection(direction) && sFleksyTwoFingerDirection != 0) {
+            if (!sFleksyTwoFingerHandled) {
+                sFleksyTwoFingerHandled = true;
+                sListener.onFleksyTwoFingerSwipe(sFleksyTwoFingerDirection);
+            }
+            return true;
+        }
+        sListener.onFleksySwipe(direction);
+        return true;
     }
 
     private void startKeySelectionByDraggingFinger(Key key) {
@@ -995,6 +1089,18 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
     private void onMoveEventInternal(final int x, final int y, final long eventTime) {
         final Key oldKey = mCurrentKey;
 
+        // Gestes Fleksy : tant que le doigt reste sous le seuil, on garde la touche de départ
+        // (pas de glissement vers une touche voisine) ; au-delà, c'est un geste.
+        if (mFleksyEligible) {
+            if (mFleksyDirection == 0) {
+                final int direction = fleksyDirectionFor(x - mStartX, y - mStartY);
+                if (direction != 0) startFleksySwipe(direction);
+            }
+            mLastX = x;
+            mLastY = y;
+            return;
+        }
+
         // todo (later): move key swipe stuff to KeyboardActionListener (and finally extend it)
         if (mKeySwipeAllowed) {
             onKeySwipe(oldKey.getCode(), x, y, eventTime);
@@ -1099,6 +1205,10 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
             return;
         }
 
+        if (handleFleksySwipeOnUp(x, y)) {
+            return;
+        }
+
         if (mKeySwipeAllowed) {
             mKeySwipeAllowed = false;
             sInKeySwipe = false;
@@ -1153,6 +1263,8 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
 
     public void onLongPressed() {
         sTimerProxy.cancelLongPressTimersOf(this);
+        if (mFleksyDirection != 0) return; // un geste Fleksy est en cours : pas d'appui long
+        mFleksyEligible = false;
         if (isShowingPopupKeysPanel()) {
             return;
         }
@@ -1219,6 +1331,8 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
     }
 
     private void onCancelEventInternal() {
+        mFleksyEligible = false;
+        mFleksyDirection = 0;
         sTimerProxy.cancelKeyTimersOf(this);
         setReleasedKeyGraphics(mCurrentKey, true);
         resetKeySelectionByDraggingFinger();
