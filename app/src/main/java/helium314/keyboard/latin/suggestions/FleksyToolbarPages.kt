@@ -119,7 +119,7 @@ class FleksyToolbarPages(
         view.gravity = Gravity.CENTER
         view.maxLines = 1
         view.setTextColor(colors.get(ColorType.SUGGESTED_WORD))
-        view.setTextSize(TypedValue.COMPLEX_UNIT_SP, if (text.length <= 2) 20f else 15f)
+        view.setTextSize(TypedValue.COMPLEX_UNIT_SP, (if (text.length <= 2) 20f else 15f) * FleksyToolbarSizes.textScale(context))
         colors.setBackground(view, ColorType.STRIP_BACKGROUND)
         val density = context.resources.displayMetrics.density
         view.minWidth = (minWidthDp * density).toInt()

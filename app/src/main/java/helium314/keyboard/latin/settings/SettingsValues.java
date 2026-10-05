@@ -306,7 +306,7 @@ public class SettingsValues {
         mSecondaryLocales = SubtypeUtilsKt.getSecondaryLocales(selectedSubtype.getExtraValue());
         mShowMorePopupKeys = SubtypeUtilsKt.getMoreKeys(selectedSubtype, prefs,
             selectedSubtype.isAsciiCapable() ? Defaults.PREF_MORE_POPUP_KEYS : LocaleKeyboardInfos.POPUP_KEYS_NORMAL);
-        mColors = KeyboardTheme.getColorsForCurrentTheme(context);
+        mColors = helium314.keyboard.keyboard.FleksyColors.wrap(context, KeyboardTheme.getColorsForCurrentTheme(context));
         mAccentShiftedIcon = prefs.getBoolean(Settings.PREF_ACCENT_SHIFTED_ICON, Defaults.PREF_ACCENT_SHIFTED_ICON);
 
         mPopupKeyOrder = SubtypeUtilsKt.getPopupKeyOrder(selectedSubtype, prefs);

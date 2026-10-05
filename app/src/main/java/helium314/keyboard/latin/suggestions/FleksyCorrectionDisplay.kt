@@ -28,13 +28,21 @@ object FleksyCorrectionDisplay {
     var onTapPrevious: (() -> Unit)? = null
     var onTapNext: (() -> Unit)? = null
 
+    /** affiche la correction (brièvement, puis la barre d'outils revient) */
     fun show(newState: State) {
         state = newState
         onChange?.invoke()
     }
 
-    /** le cycle de correction est terminé : la barre reprendra les suggestions normales à la prochaine mise à jour */
+    /** mémorise la correction sans l'afficher (après un espace) */
+    fun setSilently(newState: State) {
+        state = newState
+    }
+
+    /** le cycle de correction est terminé (nouvelle frappe…) : l'affichage disparaît */
     fun clear() {
+        if (state == null) return
         state = null
+        onChange?.invoke()
     }
 }

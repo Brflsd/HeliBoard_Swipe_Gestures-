@@ -101,6 +101,7 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         colors.setBackground(this, ColorType.STRIP_BACKGROUND)
         repeat(SuggestedWords.MAX_SUGGESTIONS) {
             val word = TextView(context, null, R.attr.suggestionWordStyle)
+            word.setTextSize(TypedValue.COMPLEX_UNIT_PX, word.textSize * FleksyToolbarSizes.textScale(context))
             word.contentDescription = resources.getString(R.string.spoken_empty_suggestion)
             word.setOnClickListener(this)
             word.setOnLongClickListener(this)
@@ -194,7 +195,10 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         }
 
         updateKeys()
-        FleksyCorrectionDisplay.onChange = { FleksyCorrectionDisplay.state?.let { renderFleksyCorrection(it) } }
+        FleksyCorrectionDisplay.onChange = {
+            val state = FleksyCorrectionDisplay.state
+            if (state != null) renderFleksyCorrection(state) else hideFleksyCorrection()
+        }
     }
 
     private lateinit var listener: Listener
@@ -272,7 +276,7 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
 
     fun setSuggestions(suggestions: SuggestedWords, isRtlLanguage: Boolean) {
         // correction façon Fleksy en cours : on garde son affichage tant que l'utilisateur n'a pas retapé
-        FleksyCorrectionDisplay.state?.let {
+        if (fleksyCorrectionVisible) FleksyCorrectionDisplay.state?.let {
             setRtl(isRtlLanguage)
             renderFleksyCorrection(it)
             return
@@ -403,14 +407,38 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
     private fun switchFleksyPage(step: Int): Boolean {
         val pages = availableFleksyPages()
         if (pages.size < 2) return false
+        // l'utilisateur change de page lui-même : on ne revient pas ensuite à l'ancienne page
+        removeCallbacks(hideCorrectionRunnable)
+        fleksyCorrectionVisible = false
+        pageBeforeCorrection = null
         val index = pages.indexOf(fleksyPage).coerceAtLeast(0)
         showFleksyPage(pages[Math.floorMod(index + step, pages.size)])
         AudioAndHapticFeedbackManager.getInstance().performHapticAndAudioFeedback(KeyCode.NOT_SPECIFIED, this, HapticEvent.KEY_PRESS)
         return true
     }
 
-    /** [livre ou mot du haut]  mot actuel  [mot du bas] — façon Fleksy */
+    // affichage temporaire de la correction : la page de la barre d'outils revient ensuite
+    private var fleksyCorrectionVisible = false
+    private var pageBeforeCorrection: FleksyToolbarPage? = null
+    private val hideCorrectionRunnable = Runnable { hideFleksyCorrection() }
+
+    private fun hideFleksyCorrection() {
+        removeCallbacks(hideCorrectionRunnable)
+        if (!fleksyCorrectionVisible) return
+        fleksyCorrectionVisible = false
+        val page = pageBeforeCorrection
+        pageBeforeCorrection = null
+        if (page != null && page != FleksyToolbarPage.SUGGESTIONS) showFleksyPage(page)
+    }
+
+    /** [livre ou mot du haut]  mot actuel  [mot du bas] — façon Fleksy, pendant une seconde */
     private fun renderFleksyCorrection(state: FleksyCorrectionDisplay.State) {
+        if (!fleksyCorrectionVisible) {
+            pageBeforeCorrection = if (isToolbarShown) fleksyPage else null
+            fleksyCorrectionVisible = true
+        }
+        removeCallbacks(hideCorrectionRunnable)
+        postDelayed(hideCorrectionRunnable, CORRECTION_DISPLAY_MILLIS)
         clear()
         suggestedWords = SuggestedWords.getEmptyInstance()
         setToolbarVisibilityInternal(false)
@@ -418,6 +446,7 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
 
         fun slot(text: String?, color: Int, bold: Boolean, onTap: (() -> Unit)?): TextView {
             val view = TextView(context, null, R.attr.suggestionWordStyle)
+            view.setTextSize(TypedValue.COMPLEX_UNIT_PX, view.textSize * FleksyToolbarSizes.textScale(context))
             view.text = text ?: ""
             view.gravity = android.view.Gravity.CENTER
             view.maxLines = 1
@@ -697,6 +726,7 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         var DEBUG_SUGGESTIONS = false
         private const val DEBUG_INFO_TEXT_SIZE_IN_DIP = 6.5f
         private const val PAGE_SWIPE_MIN_DISTANCE_DP = 50
+        private const val CORRECTION_DISPLAY_MILLIS = 1000L
         /** page affichée quand la barre d'outils s'ouvre (à l'ouverture du clavier notamment) */
         private val DEFAULT_TOOLBAR_PAGE = FleksyToolbarPage.NUMBERS
         private val TAG = SuggestionStripView::class.java.simpleName

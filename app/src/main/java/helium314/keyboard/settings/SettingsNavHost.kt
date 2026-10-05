@@ -19,6 +19,7 @@ import helium314.keyboard.latin.settings.getTransitionAnimationScale
 import helium314.keyboard.settings.screens.AboutScreen
 import helium314.keyboard.settings.screens.FleksyShortcutsScreen
 import helium314.keyboard.settings.screens.FleksyColorsScreen
+import helium314.keyboard.settings.screens.FleksyToolbarScreen
 import helium314.keyboard.settings.screens.AdvancedSettingsScreen
 import helium314.keyboard.settings.screens.AppearanceScreen
 import helium314.keyboard.settings.screens.ColorsScreen
@@ -138,6 +139,12 @@ fun SettingsNavHost(
         composable(SettingsDestination.ColorsNight + "{theme}") {
             ColorsScreen(isNight = true, theme = it.arguments?.getString("theme"), onClickBack = ::goBack)
         }
+        composable(SettingsDestination.FleksyToolbar) {
+            FleksyToolbarScreen(onClickBack = {
+                SettingsDestination.navTarget.value = SettingsDestination.Settings
+                goBack()
+            })
+        }
         composable(SettingsDestination.FleksyColors) {
             FleksyColorsScreen(onClickBack = {
                 SettingsDestination.navTarget.value = SettingsDestination.Settings
@@ -180,6 +187,7 @@ object SettingsDestination {
     const val Dictionaries = "dictionaries"
     const val FleksyShortcuts = "fleksy_shortcuts"
     const val FleksyColors = "fleksy_colors"
+    const val FleksyToolbar = "fleksy_toolbar"
     val navTarget = MutableStateFlow(Settings)
 
     private val navScope = CoroutineScope(Dispatchers.Default)

@@ -96,7 +96,7 @@ class FleksyGestures(
         candidates = list
         candidateIndex = list.indexOf(committed)
         insertedText = "$committed "
-        publishDisplay()
+        publishDisplay(visible = false) // la barre ne s'affiche qu'au glissement haut/bas
     }
 
     class PendingCommit(val typed: String, val candidates: List<String>)
@@ -156,18 +156,17 @@ class FleksyGestures(
     }
 
     /** Met à jour la barre : [vers le haut] mot actuel [vers le bas]. */
-    private fun publishDisplay() {
+    private fun publishDisplay(visible: Boolean = true) {
         if (candidates.isEmpty()) return
         val onTypedWord = candidateIndex == TYPED_WORD_INDEX
-        FleksyCorrectionDisplay.show(
-            FleksyCorrectionDisplay.State(
+        val state = FleksyCorrectionDisplay.State(
                 previous = if (onTypedWord) null else candidates[candidateIndex - 1],
                 upAddsToDictionary = onTypedWord && !addedToDictionary,
                 justAdded = onTypedWord && addedToDictionary,
                 current = candidates[candidateIndex],
                 next = if (candidates.size > 1) candidates[(candidateIndex + 1) % candidates.size] else null,
             )
-        )
+        if (visible) FleksyCorrectionDisplay.show(state) else FleksyCorrectionDisplay.setSilently(state)
     }
 
     private fun addToPersonalDictionary(word: String) {

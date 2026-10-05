@@ -358,7 +358,7 @@ public class KeyboardView extends View {
     /** Dessine une bande de couleur par rangée (clavier de lettres uniquement), si le style est activé. */
     private void drawFleksyRowBands(@NonNull final Canvas canvas, @NonNull final Keyboard keyboard) {
         mFleksyRowColors = null;
-        if (!(this instanceof MainKeyboardView) || !keyboard.mId.getElement().isAlphabet()) return;
+        if (!(this instanceof MainKeyboardView) || !keyboard.mId.getElement().isAlphaOrSymbol()) return;
         final int[] colors = FleksyColors.rowColors(getContext());
         if (colors == null) return;
         mFleksyRowColors = colors;

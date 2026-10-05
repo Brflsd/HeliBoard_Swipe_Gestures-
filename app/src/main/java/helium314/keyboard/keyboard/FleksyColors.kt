@@ -3,14 +3,18 @@ package helium314.keyboard.keyboard
 
 import android.content.Context
 import android.graphics.Color
+import android.graphics.drawable.ColorDrawable
+import android.graphics.drawable.StateListDrawable
+import android.view.View
 import androidx.core.content.edit
 import androidx.core.graphics.ColorUtils
+import helium314.keyboard.latin.common.ColorType
+import helium314.keyboard.latin.common.Colors
 import helium314.keyboard.latin.utils.prefs
 
 /**
- * Couleurs façon Fleksy : le clavier de lettres est dessiné en bandes horizontales
- * (une teinte de base, une rangée du milieu un peu plus claire, une rangée du bas plus sombre),
- * sans fond individuel sur les touches.
+ * Couleurs façon Fleksy : tout le clavier (barre d'outils, fond, rangées) prend une teinte unie,
+ * seule la rangée du milieu a sa propre teinte ; pas de fond individuel sur les touches.
  */
 object FleksyColors {
     const val PREF_BASE_COLOR = "fleksy_base_color"
@@ -37,22 +41,51 @@ object FleksyColors {
         return if (prefs.contains(PREF_MIDDLE_COLOR)) prefs.getInt(PREF_MIDDLE_COLOR, 0) else null
     }
 
-    fun setBaseColor(context: Context, color: Int?) = context.prefs().edit {
-        if (color == null) remove(PREF_BASE_COLOR) else putInt(PREF_BASE_COLOR, color)
+    fun setBaseColor(context: Context, color: Int?) {
+        context.prefs().edit { if (color == null) remove(PREF_BASE_COLOR) else putInt(PREF_BASE_COLOR, color) }
+        runCatching { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
     }
 
-    fun setMiddleColor(context: Context, color: Int?) = context.prefs().edit {
-        if (color == null) remove(PREF_MIDDLE_COLOR) else putInt(PREF_MIDDLE_COLOR, color)
+    fun setMiddleColor(context: Context, color: Int?) {
+        context.prefs().edit { if (color == null) remove(PREF_MIDDLE_COLOR) else putInt(PREF_MIDDLE_COLOR, color) }
+        runCatching { KeyboardSwitcher.getInstance().setThemeNeedsReload() }
     }
 
     fun automaticMiddle(base: Int) = ColorUtils.blendARGB(base, Color.WHITE, 0.07f)
 
-    /** [haut, milieu, bas] ou null si le style en bandes n'est pas activé (couleurs du thème). */
+    /** [haut, milieu, bas] ou null si le style Fleksy n'est pas activé (couleurs du thème). */
     @JvmStatic
     fun rowColors(context: Context): IntArray? {
         val base = baseColor(context) ?: return null
         val middle = middleColorOverride(context) ?: automaticMiddle(base)
-        val bottom = ColorUtils.blendARGB(base, Color.BLACK, 0.18f)
-        return intArrayOf(base, middle, bottom)
+        return intArrayOf(base, middle, base)
+    }
+
+    /** Remplace les couleurs de fond du thème (barre d'outils, fond, barre de navigation) par la teinte unie. */
+    @JvmStatic
+    fun wrap(context: Context, themeColors: Colors): Colors {
+        val base = baseColor(context) ?: return themeColors
+        return UniformColors(themeColors, base)
+    }
+
+    private class UniformColors(private val theme: Colors, private val base: Int) : Colors by theme {
+        private val pressed = ColorUtils.blendARGB(base, Color.WHITE, 0.15f)
+
+        override fun get(color: ColorType): Int = when (color) {
+            ColorType.MAIN_BACKGROUND, ColorType.STRIP_BACKGROUND, ColorType.NAVIGATION_BAR,
+            ColorType.MORE_SUGGESTIONS_BACKGROUND, ColorType.CLIPBOARD_SUGGESTION_BACKGROUND -> base
+            else -> theme.get(color)
+        }
+
+        override fun setBackground(view: View, color: ColorType) {
+            when (color) {
+                ColorType.MAIN_BACKGROUND -> view.background = ColorDrawable(base)
+                ColorType.STRIP_BACKGROUND -> view.background = StateListDrawable().apply {
+                    addState(intArrayOf(android.R.attr.state_pressed), ColorDrawable(pressed))
+                    addState(intArrayOf(), ColorDrawable(base))
+                }
+                else -> theme.setBackground(view, color)
+            }
+        }
     }
 }

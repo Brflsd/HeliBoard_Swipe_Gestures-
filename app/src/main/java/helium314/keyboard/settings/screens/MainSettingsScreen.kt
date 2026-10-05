@@ -83,6 +83,12 @@ fun MainSettingsScreen(
                     icon = R.drawable.ic_settings_appearance
                 ) { NextScreenIcon() }
                 Preference(
+                    name = "Taille de la barre d'outils",
+                    description = "Hauteur de la barre et taille du texte des suggestions",
+                    onClick = { SettingsDestination.navigateTo(SettingsDestination.FleksyToolbar) },
+                    icon = R.drawable.ic_settings_toolbar
+                ) { NextScreenIcon() }
+                Preference(
                     name = "Raccourcis texte",
                     description = "Textes insérés depuis la barre d'outils (adresse e-mail…)",
                     onClick = { SettingsDestination.navigateTo(SettingsDestination.FleksyShortcuts) },

@@ -71,6 +71,13 @@ fun FleksyColorsScreen(onClickBack: () -> Unit) {
             if (b != null) {
                 val rows = intArrayOf(b, middle ?: FleksyColors.automaticMiddle(b), FleksyColors.rowColors(ctx)?.get(2) ?: b)
                 Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))) {
+                    Text(
+                        "1  2  3  4  5  6  7  8  9  0",
+                        color = Color.White,
+                        fontSize = 16.sp,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth().background(Color(b)).padding(vertical = 10.dp),
+                    )
                     listOf("q w e r t z u i o p", "a s d f g h j k l", "⇧  y x c v b n m  ⌫").forEachIndexed { i, letters ->
                         Text(
                             letters,
@@ -84,8 +91,8 @@ fun FleksyColorsScreen(onClickBack: () -> Unit) {
             } else {
                 Text(
                     "Le clavier utilise actuellement les couleurs du thème choisi dans Apparence. " +
-                        "Choisissez une teinte ci-dessous pour passer au style Fleksy : des rangées en bandes, " +
-                        "sans fond derrière chaque touche.",
+                        "Choisissez une teinte ci-dessous : tout le clavier (barre d'outils comprise) prend " +
+                        "cette couleur unie, et seule la rangée du milieu peut avoir sa propre teinte.",
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }

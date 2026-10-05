@@ -567,6 +567,12 @@ public final class KeyboardSwitcher {
         mClipboardStripScrollView = mCurrentInputView.findViewById(R.id.clipboard_strip_scroll_view);
         mSuggestionStripView = mCurrentInputView.findViewById(R.id.suggestion_strip_view);
         mStripContainer = mCurrentInputView.findViewById(R.id.strip_container);
+        // Fleksy : hauteur réglable de la barre d'outils / des suggestions
+        if (mStripContainer != null && mStripContainer.getLayoutParams() != null) {
+            final float stripScale = helium314.keyboard.latin.suggestions.FleksyToolbarSizes.heightScale(mLatinIME);
+            mStripContainer.getLayoutParams().height = Math.round(
+                    mLatinIME.getResources().getDimension(R.dimen.config_suggestions_strip_height) * stripScale);
+        }
         mBackgroundGatheringIndicator = mCurrentInputView.findViewById(R.id.backgroundGatheringIndicator);
 
         prefs.registerOnSharedPreferenceChangeListener(mSuggestionStripView);
