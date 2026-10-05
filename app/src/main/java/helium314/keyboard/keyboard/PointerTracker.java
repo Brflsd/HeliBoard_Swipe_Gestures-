@@ -184,6 +184,8 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
     // direction du geste à deux doigts détecté (0 = aucun), et s'il a déjà été exécuté
     private static int sFleksyTwoFingerDirection = 0;
     private static boolean sFleksyTwoFingerHandled = false;
+    // true si ce doigt a commencé sur Maj : un glissement vers la droite ouvre les emojis
+    private boolean mShiftSwipeCandidate = false;
 
     // Touchpad mode for cursor control
     private final TouchpadHandler mTouchpadHandler = new TouchpadHandler();
@@ -667,6 +669,7 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
         }
         mFleksyEligible = false;
         mFleksyDirection = 0;
+        mShiftSwipeCandidate = false;
         // Naive up-to-down noise filter.
         final long deltaT = eventTime - mUpTime;
         if (deltaT < sParams.mTouchNoiseThresholdTime) {
@@ -765,6 +768,31 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
             sFleksyTwoFingerHandled = false;
         }
         mFleksyEligible = isFleksyEligible(key);
+        mShiftSwipeCandidate = key != null && key.getCode() == KeyCode.SHIFT && mKeyboard != null
+                && mKeyboard.mId.getElement().isAlphabet() && !sInGesture;
+    }
+
+    /** Glissement vers la droite depuis Maj : ouvre les emojis. Renvoie true si le mouvement est absorbé. */
+    private boolean handleShiftSwipeMove(final int x, final int y) {
+        if (!mShiftSwipeCandidate) return false;
+        final int dX = x - mStartX;
+        final int dY = y - mStartY;
+        if (dX >= sFleksySwipeThreshold && dX > 2 * abs(dY)) {
+            mShiftSwipeCandidate = false;
+            sTimerProxy.cancelKeyTimersOf(this);
+            final Key key = mCurrentKey;
+            setReleasedKeyGraphics(key, false);
+            // relâchement « en glissant » puis fin de glissement : Maj revient à son état d'avant l'appui
+            sListener.onReleaseKey(KeyCode.SHIFT, true);
+            sListener.onFinishSlidingInput();
+            cancelTrackingForAction();
+            sListener.onCodeInput(KeyCode.EMOJI, Constants.NOT_A_COORDINATE, Constants.NOT_A_COORDINATE, false);
+            return true;
+        }
+        // tant que ce n'est pas un glissement vers la droite, Maj reste simplement appuyée
+        mLastX = x;
+        mLastY = y;
+        return true;
     }
 
     /** Les gestes Fleksy partent des touches de caractères (lettres, chiffres, ponctuation),
@@ -1089,6 +1117,10 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
     private void onMoveEventInternal(final int x, final int y, final long eventTime) {
         final Key oldKey = mCurrentKey;
 
+        if (handleShiftSwipeMove(x, y)) {
+            return;
+        }
+
         // Gestes Fleksy : tant que le doigt reste sous le seuil, on garde la touche de départ
         // (pas de glissement vers une touche voisine) ; au-delà, c'est un geste.
         if (mFleksyEligible) {
@@ -1331,6 +1363,7 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
     }
 
     private void onCancelEventInternal() {
+        mShiftSwipeCandidate = false;
         mFleksyEligible = false;
         mFleksyDirection = 0;
         sTimerProxy.cancelKeyTimersOf(this);

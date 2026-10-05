@@ -133,6 +133,15 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
     private val enabledToolKeyBackground = GradientDrawable()
     private var direction = 1 // 1 if LTR, -1 if RTL
 
+    private val fleksyPages by lazy {
+        FleksyToolbarPages(
+            context, fleksyPageContainer, Settings.getValues().mColors,
+            listener = { listener },
+            haptic = { AudioAndHapticFeedbackManager.getInstance().performHapticAndAudioFeedback(KeyCode.NOT_SPECIFIED, this, HapticEvent.KEY_PRESS) },
+            selectedBackground = { enabledToolKeyBackground.constantState?.newDrawable(resources) },
+        )
+    }
+
     private val toolbarKeyLayoutParams = LinearLayout.LayoutParams(
         resources.getDimensionPixelSize(R.dimen.config_suggestions_strip_edge_key_width),
         LinearLayout.LayoutParams.MATCH_PARENT
@@ -188,14 +197,6 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
     }
 
     private lateinit var listener: Listener
-    private val fleksyPages by lazy {
-        FleksyToolbarPages(
-            context, fleksyPageContainer, Settings.getValues().mColors,
-            listener = { listener },
-            haptic = { AudioAndHapticFeedbackManager.getInstance().performHapticAndAudioFeedback(KeyCode.NOT_SPECIFIED, this, HapticEvent.KEY_PRESS) },
-            selectedBackground = { enabledToolKeyBackground.constantState?.newDrawable(resources) },
-        )
-    }
     private var suggestedWords = SuggestedWords.getEmptyInstance()
     private var startIndexOfMoreSuggestions = 0
     private var isExternalSuggestionVisible = false // Required to disable the more suggestions if other suggestions are visible
@@ -244,9 +245,12 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
     }
 
     fun setToolbarVisibility(toolbarVisible: Boolean) {
-        // déjà sur une page Fleksy (chiffres, raccourcis…) : on y reste
-        if (toolbarVisible && fleksyPageContainer.isVisible) return
-        setToolbarVisibilityInternal(toolbarVisible)
+        if (toolbarVisible) {
+            // barre déjà affichée (n'importe quelle page) : on y reste ; sinon on ouvre la page par défaut
+            if (!isToolbarShown) showFleksyPage(DEFAULT_TOOLBAR_PAGE)
+        } else {
+            setToolbarVisibilityInternal(false)
+        }
     }
 
     private fun setToolbarVisibilityInternal(toolbarVisible: Boolean) {
@@ -648,6 +652,8 @@ class SuggestionStripView(context: Context, attrs: AttributeSet?, defStyle: Int)
         var DEBUG_SUGGESTIONS = false
         private const val DEBUG_INFO_TEXT_SIZE_IN_DIP = 6.5f
         private const val PAGE_SWIPE_MIN_DISTANCE_DP = 50
+        /** page affichée quand la barre d'outils s'ouvre (à l'ouverture du clavier notamment) */
+        private val DEFAULT_TOOLBAR_PAGE = FleksyToolbarPage.NUMBERS
         private val TAG = SuggestionStripView::class.java.simpleName
     }
 }

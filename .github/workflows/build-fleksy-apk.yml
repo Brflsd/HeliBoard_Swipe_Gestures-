@@ -39,7 +39,7 @@ jobs:
       - name: Compiler
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug
+          ./gradlew assembleDebug -PfleksyBuild=${{ github.run_number }}
 
       - name: Publier l'APK
         uses: actions/upload-artifact@v4

@@ -178,8 +178,8 @@ object Defaults {
     const val PREF_QUICK_PIN_TOOLBAR_KEYS = false
     val PREF_PINNED_TOOLBAR_KEYS = defaultPinnedToolbarPref
     val PREF_TOOLBAR_KEYS = defaultToolbarPref
-    const val PREF_AUTO_SHOW_TOOLBAR = false
-    const val PREF_AUTO_HIDE_TOOLBAR = false
+    const val PREF_AUTO_SHOW_TOOLBAR = true // Fleksy : barre des chiffres à l'ouverture du clavier
+    const val PREF_AUTO_HIDE_TOOLBAR = true // Fleksy : les suggestions remplacent la barre pendant la frappe
     val PREF_CLIPBOARD_TOOLBAR_KEYS = defaultClipboardToolbarPref
     const val PREF_ABC_AFTER_EMOJI = false
     const val PREF_ABC_AFTER_CLIP = false

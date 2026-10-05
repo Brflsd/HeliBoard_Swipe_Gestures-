@@ -14,12 +14,26 @@ android {
         minSdk = 21
         targetSdk = 37
         versionCode = 4200
-        versionName = "4.2-beta1"
+        // numéro de compilation GitHub affiché dans « À propos » (ex. 4.2-beta1-fleksy3)
+        versionName = "4.2-beta1" + (project.findProperty("fleksyBuild")?.let { "-fleksy$it" } ?: "")
         ndk {
             abiFilters.clear()
             abiFilters.addAll(listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64"))
         }
         proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+    }
+
+    // Clé de signature fixe du dépôt : chaque nouvelle APK s'installe par-dessus la précédente
+    val fleksyKeystore = rootProject.file(".github/signing/fleksy-debug.keystore")
+    signingConfigs {
+        if (fleksyKeystore.exists()) {
+            create("fleksy") {
+                storeFile = fleksyKeystore
+                storePassword = "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
+            }
+        }
     }
 
     buildTypes {
@@ -41,6 +55,7 @@ android {
             isMinifyEnabled = true
             isJniDebuggable = false
             applicationIdSuffix = ".debug"
+            if (fleksyKeystore.exists()) signingConfig = signingConfigs.getByName("fleksy")
         }
         create("runTests") { // build variant for running tests on CI that skips tests known to fail
             isMinifyEnabled = false
