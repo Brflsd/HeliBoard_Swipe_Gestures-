@@ -188,6 +188,7 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
     private boolean mShiftSwipeCandidate = false;
     // true si ce doigt a commencé sur effacer : un glissement vers le haut fait un retour à la ligne
     private boolean mDeleteSwipeCandidate = false;
+    private boolean mEmojiExitSwipeCandidate = false;
     // touche dont le panneau d'appui long est affiché (pour passer au panneau d'une autre lettre en glissant)
     @Nullable private Key mPopupSourceKey;
     private static final int sPopupSwitchMargin = KtxKt.dpToPx(4, Resources.getSystem());
@@ -676,6 +677,7 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
         mFleksyDirection = 0;
         mShiftSwipeCandidate = false;
         mDeleteSwipeCandidate = false;
+        mEmojiExitSwipeCandidate = false;
         mPopupSourceKey = null;
         // Naive up-to-down noise filter.
         final long deltaT = eventTime - mUpTime;
@@ -776,7 +778,10 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
         }
         mFleksyEligible = isFleksyEligible(key);
         mShiftSwipeCandidate = key != null && key.getCode() == KeyCode.SHIFT && mKeyboard != null
-                && mKeyboard.mId.getElement().isAlphabet() && !sInGesture;
+                && mKeyboard.mId.getElement().isAlphaOrSymbol() && !sInGesture;
+        // touche ABC de la barre des emojis : glisser vers le haut ramène aux lettres (même geste que pour y entrer)
+        mEmojiExitSwipeCandidate = key != null && key.getCode() == KeyCode.ALPHA && mKeyboard != null
+                && mKeyboard.mId.getElement() == KeyboardElement.EMOJI_BOTTOM_ROW;
         mDeleteSwipeCandidate = key != null && key.getCode() == KeyCode.DELETE && !sInGesture;
     }
 
@@ -795,9 +800,27 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
             sInKeySwipe = false;
         }
         cancelTrackingForAction();
-        // SHIFT_ENTER insère toujours un saut de ligne (même là où Entrée enverrait le message)
-        sListener.onCodeInput(KeyCode.SHIFT_ENTER, Constants.NOT_A_COORDINATE, Constants.NOT_A_COORDINATE, false);
+        // champ multiligne : saut de ligne ; recherche, formulaire… : Entrée (valider)
+        sListener.onFleksyNewlineOrEnter();
         sListener.onCustomRequest(KeyboardActionListener.CustomAction.PERFORM_HAPTIC);
+        return true;
+    }
+
+    /** Barre des emojis : glisser vers le haut depuis ABC revient aux lettres. */
+    private boolean handleEmojiExitSwipe(final int x, final int y) {
+        if (!mEmojiExitSwipeCandidate) return false;
+        final int dX = x - mStartX;
+        final int dY = y - mStartY;
+        if (-dY < sFleksySwipeThreshold || -dY < 2 * abs(dX)) {
+            mLastX = x;
+            mLastY = y;
+            return true; // reste appuyée en attendant
+        }
+        mEmojiExitSwipeCandidate = false;
+        sTimerProxy.cancelKeyTimersOf(this);
+        setReleasedKeyGraphics(mCurrentKey, false);
+        cancelTrackingForAction();
+        sListener.onCodeInput(KeyCode.ALPHA, Constants.NOT_A_COORDINATE, Constants.NOT_A_COORDINATE, false);
         return true;
     }
 
@@ -814,6 +837,8 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
         final Key key = mKeyDetector.detectHitKey(x, y);
         if (key == null || key == source || !isFleksyEligible(key)
                 || key.getPopupKeys() == null || key.hasNoPanelAutoPopupKey()) return false;
+        // seulement en glissant le long de la même rangée : monter vers le panneau ne change pas de lettre
+        if (key.getY() != source.getY()) return false;
 
         dismissPopupKeysPanel();
         mLastX = x;
@@ -870,8 +895,10 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
             sListener.onReleaseKey(KeyCode.SHIFT, true);
             sListener.onFinishSlidingInput();
             cancelTrackingForAction();
-            // haut : emojis ; droite : clavier des symboles (ceux de l'appui long sur les lettres)
-            sListener.onCodeInput(up ? KeyCode.EMOJI : KeyCode.SYMBOL, Constants.NOT_A_COORDINATE, Constants.NOT_A_COORDINATE, false);
+            // haut : emojis ; droite : clavier des symboles (ceux de l'appui long), ou retour aux lettres depuis les symboles
+            final boolean inSymbols = mKeyboard != null && !mKeyboard.mId.getElement().isAlphabet();
+            final int code = up ? KeyCode.EMOJI : (inSymbols ? KeyCode.ALPHA : KeyCode.SYMBOL);
+            sListener.onCodeInput(code, Constants.NOT_A_COORDINATE, Constants.NOT_A_COORDINATE, false);
             return true;
         }
         // tant que ce n'est pas un glissement vers le haut ou la droite, Maj reste simplement appuyée
@@ -1211,6 +1238,9 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
         if (handleDeleteSwipeUp(x, y)) {
             return;
         }
+        if (handleEmojiExitSwipe(x, y)) {
+            return;
+        }
 
         // Gestes Fleksy : tant que le doigt reste sous le seuil, on garde la touche de départ
         // (pas de glissement vers une touche voisine) ; au-delà, c'est un geste.
@@ -1457,6 +1487,7 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
     private void onCancelEventInternal() {
         mShiftSwipeCandidate = false;
         mDeleteSwipeCandidate = false;
+        mEmojiExitSwipeCandidate = false;
         mPopupSourceKey = null;
         mFleksyEligible = false;
         mFleksyDirection = 0;

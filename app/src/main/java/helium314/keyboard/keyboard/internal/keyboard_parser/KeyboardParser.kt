@@ -15,6 +15,7 @@ import helium314.keyboard.keyboard.internal.keyboard_parser.floris.KeyLabel
 import helium314.keyboard.keyboard.internal.keyboard_parser.floris.KeyType
 import helium314.keyboard.keyboard.internal.keyboard_parser.floris.SimplePopups
 import helium314.keyboard.keyboard.internal.keyboard_parser.floris.TextKeyData
+import helium314.keyboard.latin.common.Constants
 import helium314.keyboard.latin.common.isEmoji
 import helium314.keyboard.latin.define.DebugFlags
 import helium314.keyboard.latin.settings.Settings
@@ -89,10 +90,23 @@ class KeyboardParser(private val params: KeyboardParams, private val context: Co
         }
 
         // Gestes Fleksy : rangée de la barre d'espace cachée avec deux pouces vers le bas
-        if (params.mId.element.isAlphabet && FleksyGestures.isSpaceRowHidden(context))
+        // (lettres et symboles ; pour les emojis, seule la barre d'espace disparaît de la rangée du bas)
+        if (params.mId.element.isAlphaOrSymbol && FleksyGestures.isSpaceRowHidden(context))
             removeSpaceRow(keysInRows)
+        if (params.mId.element == KeyboardElement.EMOJI_BOTTOM_ROW && FleksyGestures.isSpaceRowHidden(context))
+            removeSpaceKey(keysInRows)
 
         return keysInRows
+    }
+
+    /** Retire la barre d'espace (et les espaces vides) d'une rangée, les autres touches se partagent la largeur. */
+    private fun removeSpaceKey(keysInRows: ArrayList<ArrayList<KeyParams>>) {
+        val row = keysInRows.firstOrNull() ?: return
+        if (row.none { it.mCode == Constants.CODE_SPACE }) return
+        row.removeAll { it.isSpacer || it.mCode == Constants.CODE_SPACE }
+        val total = row.sumOf { it.mWidth }
+        if (total <= 0f) return
+        row.forEach { it.mWidth /= total }
     }
 
     /** Retire la dernière rangée (barre d'espace) et réduit la hauteur du clavier d'autant,

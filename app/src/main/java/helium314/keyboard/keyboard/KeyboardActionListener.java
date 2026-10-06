@@ -137,6 +137,9 @@ public interface KeyboardActionListener {
     /** Glissement simultané de deux doigts vers le haut ou le bas (afficher/cacher la rangée de la barre d'espace). */
     default void onFleksyTwoFingerSwipe(int direction) {}
 
+    /** Glissement vers le haut depuis effacer : saut de ligne dans un texte, Entrée dans une recherche ou un formulaire. */
+    default void onFleksyNewlineOrEnter() {}
+
     KeyboardActionListener EMPTY_LISTENER = new Adapter();
 
     enum SwipeAction { NONE, MOVE_CURSOR, SWITCH_LANGUAGE, TOGGLE_NUMPAD, TOGGLE_DPAD, HIDE_KEYBOARD, TOUCHPAD_MODE }

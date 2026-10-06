@@ -126,6 +126,14 @@ class KeyboardActionListenerImpl(private val latinIME: LatinIME, private val inp
 
     override fun onFleksyTwoFingerSwipe(direction: Int) = fleksyGestures.onTwoFingerSwipe(direction)
 
+    override fun onFleksyNewlineOrEnter() {
+        val inputType = latinIME.currentInputEditorInfo?.inputType ?: 0
+        val isTextClass = (inputType and InputType.TYPE_MASK_CLASS) == InputType.TYPE_CLASS_TEXT
+        val multiLine = isTextClass && (inputType and InputType.TYPE_TEXT_FLAG_MULTI_LINE) != 0
+        val code = if (multiLine) KeyCode.SHIFT_ENTER else Constants.CODE_ENTER
+        onCodeInput(code, Constants.NOT_A_COORDINATE, Constants.NOT_A_COORDINATE, false)
+    }
+
     private fun onCodeInputInternal(primaryCode: Int, x: Int, y: Int, isKeyRepeat: Boolean) {
         when (primaryCode) {
             KeyCode.TOGGLE_AUTOCORRECT -> return settings.toggleAutoCorrect()
