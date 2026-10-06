@@ -64,13 +64,15 @@ jobs:
 
       - name: Vérifier l'APK (signature, non déboguable)
         run: |
-          APK=app/build/outputs/apk/release/SwipeLibre-release.apk
+          APK=$(find app/build/outputs/apk/release -name "*.apk" | head -1)
+          if [ -z "$APK" ]; then echo "::error::Aucune APK trouvée"; ls -R app/build/outputs/apk || true; exit 1; fi
           BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
-          "$BT/apksigner" verify --print-certs "$APK" | grep -E "Signer #1 certificate (DN|SHA-256)"
-          if "$BT/aapt" dump badging "$APK" | grep -q "application-debuggable"; then
-            echo "::error::L'APK est déboguable"; exit 1
-          fi
-          "$BT/aapt" dump badging "$APK" | grep -E "^package:|application-label:"
+          CERT=$("$BT/apksigner" verify --print-certs "$APK" | grep -E "certificate (DN|SHA-256 digest)" | tr '\n' ' ') \
+            || { echo "::error::APK non signée ou signature invalide ($APK)"; exit 1; }
+          echo "::notice::Signature : $CERT"
+          BADGING=$("$BT/aapt2" dump badging "$APK")
+          if echo "$BADGING" | grep -q "application-debuggable"; then echo "::error::L'APK est déboguable"; exit 1; fi
+          echo "::notice::$(echo "$BADGING" | grep -E "^package:" | cut -c1-200)"
           cp "$APK" "SwipeLibre-1.$BUILD_NUMBER.apk"
           rm -f "$RUNNER_TEMP/swipelibre.keystore"
 
