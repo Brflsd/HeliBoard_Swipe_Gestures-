@@ -38,8 +38,10 @@ jobs:
           SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
         run: |
           if [ -z "$SIGNING_KEYSTORE_B64" ] || [ -z "$SIGNING_PASSWORD" ]; then
-            echo "::error::Secrets SIGNING_KEYSTORE_B64 et SIGNING_PASSWORD manquants (Settings → Secrets and variables → Actions)."
-            exit 1
+            # sans clé : on compile quand même pour vérifier le code, mais rien n'est publié
+            echo "::warning::Secrets SIGNING_KEYSTORE_B64 et SIGNING_PASSWORD manquants : compilation de contrôle uniquement."
+            echo "UNSIGNED=true" >> "$GITHUB_ENV"
+            exit 0
           fi
           echo "$SIGNING_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/swipelibre.keystore"
           echo "SWIPELIBRE_KEYSTORE=$RUNNER_TEMP/swipelibre.keystore" >> "$GITHUB_ENV"
@@ -53,6 +55,12 @@ jobs:
         run: |
           chmod +x gradlew
           ./gradlew assembleRelease -PswipeLibreBuild=$BUILD_NUMBER
+
+      - name: Arrêt sans clé de signature
+        if: env.UNSIGNED == 'true'
+        run: |
+          echo "::error::Code compilé avec succès, mais aucune APK publiée : ajoutez les secrets SIGNING_KEYSTORE_B64 et SIGNING_PASSWORD (Settings → Secrets and variables → Actions)."
+          exit 1
 
       - name: Vérifier l'APK (signature, non déboguable)
         run: |
