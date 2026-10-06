@@ -43,7 +43,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           git push origin HEAD:main
-          gh workflow run build-swipelibre.yml --ref main
+          gh workflow run build-heliflick.yml --ref main
 
       - name: Signaler un conflit
         if: steps.merge.outputs.conflict == 'true' || failure()

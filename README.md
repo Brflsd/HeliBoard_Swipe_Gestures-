@@ -1,15 +1,15 @@
-# SwipeLibre
+# HeliFlick
 
 **Un clavier Android rapide aux gestes, avec tous les emojis récents, 100 % hors ligne.**
 *A fast gesture keyboard for Android with all the latest emojis — 100 % offline.* ([English below](#english))
 
-Vous utilisiez **Fleksy** et il n'est plus mis à jour depuis 2023 ? SwipeLibre reprend les gestes qui faisaient sa force — espace, effacement et correction d'un simple glissement — sur la base moderne et maintenue de [HeliBoard](https://github.com/HeliBorg/HeliBoard).
+Vous utilisiez **Fleksy** et il n'est plus mis à jour depuis 2023 ? HeliFlick reprend les gestes qui faisaient sa force — espace, effacement et correction d'un simple glissement — sur la base moderne et maintenue de [HeliBoard](https://github.com/HeliBorg/HeliBoard).
 
-> SwipeLibre n'est ni affilié à Fleksy ni approuvé par ses auteurs. « Fleksy » est cité uniquement pour décrire la façon de taper dont SwipeLibre s'inspire.
+> HeliFlick est une **version non officielle** de HeliBoard, indépendante de ses auteurs. Il n'est pas non plus affilié à Fleksy ; ce nom est cité uniquement pour décrire la façon de taper dont HeliFlick s'inspire.
 
 [**⬇ Télécharger la dernière version (APK)**](../../releases/latest)
 
-## Pourquoi SwipeLibre
+## Pourquoi HeliFlick
 
 - **Gestes façon Fleksy** : tapez sans viser la barre d'espace ni la touche effacer.
 - **Tous les emojis récents** : Unicode 17 inclus (🫩 🫆 🫪 …), mis à jour avec HeliBoard.
@@ -29,7 +29,7 @@ Vous utilisiez **Fleksy** et il n'est plus mis à jour depuis 2023 ? SwipeLibre 
 | **Deux pouces** vers le bas / le haut | Cacher / afficher la rangée de la barre d'espace |
 | **Maj** → glisser vers le haut | Emojis |
 | **Maj** → glisser à droite | Clavier des symboles |
-| **Effacer** → glisser vers le haut | Retour à la ligne |
+| **Effacer** → glisser vers le haut | Retour à la ligne (ou Entrée dans une recherche / un formulaire) |
 | Glisser **horizontalement sur la barre du haut** | Pages : chiffres, raccourcis, copier/coller, disposition |
 
 **Appui long** sur une lettre : accents et symboles (é è ê, & _ …). Sans lever le doigt, glissez sur une autre lettre pour voir ses variantes. Appui long sur **b** : point et virgule.
@@ -40,18 +40,18 @@ Vous utilisiez **Fleksy** et il n'est plus mis à jour depuis 2023 ? SwipeLibre 
 
 1. Sur votre téléphone, téléchargez le fichier `.apk` de la [dernière version](../../releases/latest).
 2. Ouvrez-le et autorisez l'installation depuis cette source si Android le demande.
-3. **Paramètres → Système → Clavier → Clavier à l'écran** : activez **SwipeLibre**.
-4. Dans les réglages de SwipeLibre, **Langues et dispositions** : ajoutez vos langues.
+3. **Paramètres → Système → Clavier → Clavier à l'écran** : activez **HeliFlick**.
+4. Dans les réglages de HeliFlick, **Langues et dispositions** : ajoutez vos langues.
 
-SwipeLibre s'installe **à côté** de HeliBoard ou d'un autre clavier, sans les remplacer. Les mises à jour s'installent par-dessus la version précédente.
+HeliFlick s'installe **à côté** de HeliBoard ou d'un autre clavier, sans les remplacer. Les mises à jour s'installent par-dessus la version précédente.
 
-**Sécurité** : n'installez SwipeLibre que depuis la page [Releases](../../releases) de ce dépôt. Chaque version y est compilée automatiquement depuis le code source visible ici, et signée avec une clé qui n'est jamais publiée.
+**Sécurité** : n'installez HeliFlick que depuis la page [Releases](../../releases) de ce dépôt. Chaque version y est compilée automatiquement depuis le code source visible ici, et signée avec une clé qui n'est jamais publiée.
 
 ## Crédits et licence
 
-SwipeLibre est une version modifiée de [HeliBoard](https://github.com/HeliBorg/HeliBoard) (Helium314 et contributeurs), lui-même basé sur OpenBoard et le clavier AOSP. Tout le travail de fond — dictionnaires, correction, dispositions, emojis — vient de ces projets ; le [README d'origine](README-HeliBoard.md) détaille leurs fonctionnalités et leurs auteurs.
+HeliFlick est une version modifiée de [HeliBoard](https://github.com/HeliBorg/HeliBoard) (Helium314 et contributeurs), lui-même basé sur OpenBoard et le clavier AOSP. Tout le travail de fond — dictionnaires, correction, dispositions, emojis — vient de ces projets ; le [README d'origine](README-HeliBoard.md) détaille leurs fonctionnalités et leurs auteurs.
 
-Les modifications de SwipeLibre (gestes, barre d'outils en pages, couleurs, raccourcis) ont été écrites avec l'aide d'une IA (Claude) et testées à la main. Merci de ne **pas** signaler les problèmes de SwipeLibre au projet HeliBoard : ouvrez plutôt une [issue ici](../../issues).
+Les modifications de HeliFlick (gestes, barre d'outils en pages, couleurs, raccourcis) ont été écrites avec l'aide d'une IA (Claude) et testées à la main. Merci de ne **pas** signaler les problèmes de HeliFlick au projet HeliBoard : ouvrez plutôt une [issue ici](../../issues).
 
 Licence : [GPL-3.0](LICENSE), comme HeliBoard.
 
@@ -59,8 +59,8 @@ Licence : [GPL-3.0](LICENSE), comme HeliBoard.
 
 ## English
 
-**SwipeLibre** is a fork of [HeliBoard](https://github.com/HeliBorg/HeliBoard) that brings back the gesture typing style of the discontinued Fleksy keyboard (not affiliated): swipe right for space, left to delete a word, up/down to cycle corrections, two thumbs to hide the space row, plus a swipeable toolbar (numbers, text shortcuts, clipboard, layout). It includes all recent emojis (Unicode 17), has **no internet permission**, and is licensed under GPL-3.0.
+**HeliFlick** is an unofficial fork of [HeliBoard](https://github.com/HeliBorg/HeliBoard) that brings back the gesture typing style of the discontinued Fleksy keyboard (not affiliated): swipe right for space, left to delete a word, up/down to cycle corrections, two thumbs to hide the space row, plus a swipeable toolbar (numbers, text shortcuts, clipboard, layout). It includes all recent emojis (Unicode 17), has **no internet permission**, and is licensed under GPL-3.0.
 
-[**⬇ Download the latest APK**](../../releases/latest) · Settings → System → Keyboard → On-screen keyboard → enable **SwipeLibre**.
+[**⬇ Download the latest APK**](../../releases/latest) · Settings → System → Keyboard → On-screen keyboard → enable **HeliFlick**.
 
-The SwipeLibre-specific settings are currently in French only.
+The HeliFlick-specific settings are currently in French only.

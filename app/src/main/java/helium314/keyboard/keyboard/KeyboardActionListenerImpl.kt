@@ -5,6 +5,8 @@ import android.text.InputType
 import android.util.SparseArray
 import android.view.KeyEvent
 import android.view.inputmethod.InputMethodSubtype
+import helium314.keyboard.latin.utils.InputTypeUtils
+import android.view.inputmethod.EditorInfo
 import androidx.core.util.forEach
 import androidx.core.view.inputmethod.EditorInfoCompat
 import androidx.core.view.inputmethod.InputContentInfoCompat
@@ -127,10 +129,18 @@ class KeyboardActionListenerImpl(private val latinIME: LatinIME, private val inp
     override fun onFleksyTwoFingerSwipe(direction: Int) = fleksyGestures.onTwoFingerSwipe(direction)
 
     override fun onFleksyNewlineOrEnter() {
-        val inputType = latinIME.currentInputEditorInfo?.inputType ?: 0
-        val isTextClass = (inputType and InputType.TYPE_MASK_CLASS) == InputType.TYPE_CLASS_TEXT
-        val multiLine = isTextClass && (inputType and InputType.TYPE_TEXT_FLAG_MULTI_LINE) != 0
-        val code = if (multiLine) KeyCode.SHIFT_ENTER else Constants.CODE_ENTER
+        // même logique que la touche Entrée : si le champ annonce une action (rechercher, envoyer, valider…),
+        // on l'exécute ; sinon saut de ligne
+        val editorInfo = latinIME.currentInputEditorInfo
+        val actionId = editorInfo?.let { InputTypeUtils.getImeOptionsActionIdFromEditorInfo(it) } ?: EditorInfo.IME_ACTION_NONE
+        val inputType = editorInfo?.inputType ?: 0
+        val multiLine = (inputType and InputType.TYPE_MASK_CLASS) == InputType.TYPE_CLASS_TEXT
+                && (inputType and InputType.TYPE_TEXT_FLAG_MULTI_LINE) != 0
+        val code = when (actionId) {
+            EditorInfo.IME_ACTION_NONE -> KeyCode.SHIFT_ENTER // champ de texte libre (notes, messagerie…)
+            EditorInfo.IME_ACTION_UNSPECIFIED -> if (multiLine) KeyCode.SHIFT_ENTER else Constants.CODE_ENTER
+            else -> Constants.CODE_ENTER // recherche, envoi, suivant, OK… : on valide
+        }
         onCodeInput(code, Constants.NOT_A_COORDINATE, Constants.NOT_A_COORDINATE, false)
     }
 

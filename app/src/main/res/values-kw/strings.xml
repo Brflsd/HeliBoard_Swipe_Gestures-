@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="spell_checker_service_name">Checkyer Lytherennans SwipeLibre</string>
-    <string name="ime_settings">Settyansow SwipeLibre</string>
-    <string name="android_spell_checker_settings">Settyansow Checkyer Lytherennans SwipeLibre</string>
+    <string name="spell_checker_service_name">Checkyer Lytherennans HeliFlick</string>
+    <string name="ime_settings">Settyansow HeliFlick</string>
+    <string name="android_spell_checker_settings">Settyansow Checkyer Lytherennans HeliFlick</string>
     <string name="vibrate_on_keypress">Krena war tava</string>
     <string name="vibrate_in_dnd_mode">Krena yn fordh na ankombra</string>
     <string name="sound_on_keypress">Sowndya war tava</string>

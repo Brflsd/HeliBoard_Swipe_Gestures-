@@ -10,14 +10,14 @@ android {
     compileSdk = 37
 
     defaultConfig {
-        // SwipeLibre : identifiant propre, s'installe à côté de HeliBoard
-        applicationId = "io.github.brflsd.swipelibre"
+        // HeliFlick : identifiant propre, s'installe à côté de HeliBoard
+        applicationId = "io.github.brflsd.heliflick"
         minSdk = 21
         targetSdk = 37
-        // numéro de compilation GitHub : version SwipeLibre 1.<n>, basée sur HeliBoard 4.2-beta1
-        val swipeLibreBuild = (project.findProperty("swipeLibreBuild") as String?)?.toIntOrNull() ?: 0
-        versionCode = 100000 + swipeLibreBuild
-        versionName = "1.$swipeLibreBuild (HeliBoard 4.2-beta1)"
+        // numéro de compilation GitHub : version HeliFlick 1.<n>, basée sur HeliBoard 4.2-beta1
+        val heliFlickBuild = (project.findProperty("heliFlickBuild") as String?)?.toIntOrNull() ?: 0
+        versionCode = 100000 + heliFlickBuild
+        versionName = "1.$heliFlickBuild (HeliBoard 4.2-beta1)"
         ndk {
             abiFilters.clear()
             abiFilters.addAll(listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64"))
@@ -25,15 +25,15 @@ android {
         proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
     }
 
-    // Clé de signature SwipeLibre : fournie par les secrets GitHub (jamais dans le dépôt)
-    val swipeLibreKeystore = System.getenv("SWIPELIBRE_KEYSTORE")?.let { file(it) }?.takeIf { it.exists() }
+    // Clé de signature HeliFlick : fournie par les secrets GitHub (jamais dans le dépôt)
+    val heliFlickKeystore = System.getenv("HELIFLICK_KEYSTORE")?.let { file(it) }?.takeIf { it.exists() }
     signingConfigs {
-        if (swipeLibreKeystore != null) {
-            create("swipelibre") {
-                storeFile = swipeLibreKeystore
-                storePassword = System.getenv("SWIPELIBRE_KEYSTORE_PASSWORD")
-                keyAlias = "swipelibre"
-                keyPassword = System.getenv("SWIPELIBRE_KEYSTORE_PASSWORD")
+        if (heliFlickKeystore != null) {
+            create("heliflick") {
+                storeFile = heliFlickKeystore
+                storePassword = System.getenv("HELIFLICK_KEYSTORE_PASSWORD")
+                keyAlias = "swipelibre" // alias interne de la clé (créée sous l'ancien nom)
+                keyPassword = System.getenv("HELIFLICK_KEYSTORE_PASSWORD")
             }
         }
     }
@@ -44,7 +44,7 @@ android {
             isShrinkResources = false
             isDebuggable = false
             isJniDebuggable = false
-            if (swipeLibreKeystore != null) signingConfig = signingConfigs.getByName("swipelibre")
+            if (heliFlickKeystore != null) signingConfig = signingConfigs.getByName("heliflick")
         }
         create("nouserlib") { // same as release, but does not allow the user to provide a library
             isMinifyEnabled = true
@@ -83,7 +83,7 @@ android {
             }
             variant.outputs.forEach { output ->
                 if (output is com.android.build.api.variant.impl.VariantOutputImpl) {
-                    output.outputFileName = "SwipeLibre-${variant.buildType}.apk"
+                    output.outputFileName = "HeliFlick-${variant.buildType}.apk"
                 }
             }
         }

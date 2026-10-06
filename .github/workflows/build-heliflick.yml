@@ -1,4 +1,4 @@
-name: Compiler et publier SwipeLibre
+name: Compiler et publier HeliFlick
 
 # Compile l'APK signée à chaque modification de la branche principale (ou à la demande),
 # puis la publie comme « Release » GitHub : lien direct pour les utilisateurs.
@@ -12,7 +12,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: build-swipelibre
+  group: build-heliflick
   cancel-in-progress: false
 
 jobs:
@@ -43,10 +43,10 @@ jobs:
             echo "UNSIGNED=true" >> "$GITHUB_ENV"
             exit 0
           fi
-          echo "$SIGNING_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/swipelibre.keystore"
-          echo "SWIPELIBRE_KEYSTORE=$RUNNER_TEMP/swipelibre.keystore" >> "$GITHUB_ENV"
+          echo "$SIGNING_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/heliflick.keystore"
+          echo "HELIFLICK_KEYSTORE=$RUNNER_TEMP/heliflick.keystore" >> "$GITHUB_ENV"
           echo "::add-mask::$SIGNING_PASSWORD"
-          echo "SWIPELIBRE_KEYSTORE_PASSWORD=$SIGNING_PASSWORD" >> "$GITHUB_ENV"
+          echo "HELIFLICK_KEYSTORE_PASSWORD=$SIGNING_PASSWORD" >> "$GITHUB_ENV"
 
       - name: Numéro de version
         run: echo "BUILD_NUMBER=$(git rev-list --count HEAD)" >> "$GITHUB_ENV"
@@ -54,7 +54,7 @@ jobs:
       - name: Compiler
         run: |
           chmod +x gradlew
-          ./gradlew assembleRelease -PswipeLibreBuild=$BUILD_NUMBER
+          ./gradlew assembleRelease -PheliFlickBuild=$BUILD_NUMBER
 
       - name: Arrêt sans clé de signature
         if: env.UNSIGNED == 'true'
@@ -73,15 +73,15 @@ jobs:
           BADGING=$("$BT/aapt2" dump badging "$APK")
           if echo "$BADGING" | grep -q "application-debuggable"; then echo "::error::L'APK est déboguable"; exit 1; fi
           echo "::notice::$(echo "$BADGING" | grep -E "^package:" | cut -c1-200)"
-          cp "$APK" "SwipeLibre-1.$BUILD_NUMBER.apk"
-          rm -f "$RUNNER_TEMP/swipelibre.keystore"
+          cp "$APK" "HeliFlick-1.$BUILD_NUMBER.apk"
+          rm -f "$RUNNER_TEMP/heliflick.keystore"
 
       - name: Publier la version
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "v1.$BUILD_NUMBER" "SwipeLibre-1.$BUILD_NUMBER.apk" \
-            --title "SwipeLibre 1.$BUILD_NUMBER" \
+          gh release create "v1.$BUILD_NUMBER" "HeliFlick-1.$BUILD_NUMBER.apk" \
+            --title "HeliFlick 1.$BUILD_NUMBER" \
             --notes "Compilée automatiquement depuis le commit ${GITHUB_SHA::7}. Installez le fichier .apk ci-dessous sur votre téléphone." \
             --latest
 
