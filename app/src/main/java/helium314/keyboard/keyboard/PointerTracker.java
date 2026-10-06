@@ -186,6 +186,11 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
     private static boolean sFleksyTwoFingerHandled = false;
     // true si ce doigt a commencé sur Maj : un glissement vers la droite ouvre les emojis
     private boolean mShiftSwipeCandidate = false;
+    // true si ce doigt a commencé sur effacer : un glissement vers le haut fait un retour à la ligne
+    private boolean mDeleteSwipeCandidate = false;
+    // touche dont le panneau d'appui long est affiché (pour passer au panneau d'une autre lettre en glissant)
+    @Nullable private Key mPopupSourceKey;
+    private static final int sPopupSwitchMargin = KtxKt.dpToPx(4, Resources.getSystem());
 
     // Touchpad mode for cursor control
     private final TouchpadHandler mTouchpadHandler = new TouchpadHandler();
@@ -670,6 +675,8 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
         mFleksyEligible = false;
         mFleksyDirection = 0;
         mShiftSwipeCandidate = false;
+        mDeleteSwipeCandidate = false;
+        mPopupSourceKey = null;
         // Naive up-to-down noise filter.
         final long deltaT = eventTime - mUpTime;
         if (deltaT < sParams.mTouchNoiseThresholdTime) {
@@ -770,6 +777,59 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
         mFleksyEligible = isFleksyEligible(key);
         mShiftSwipeCandidate = key != null && key.getCode() == KeyCode.SHIFT && mKeyboard != null
                 && mKeyboard.mId.getElement().isAlphabet() && !sInGesture;
+        mDeleteSwipeCandidate = key != null && key.getCode() == KeyCode.DELETE && !sInGesture;
+    }
+
+    /** Glissement vers le haut depuis effacer : retour à la ligne. Renvoie true si le geste a été exécuté. */
+    private boolean handleDeleteSwipeUp(final int x, final int y) {
+        if (!mDeleteSwipeCandidate || mInHorizontalSwipe) return false;
+        final int dX = x - mStartX;
+        final int dY = y - mStartY;
+        if (-dY < sFleksySwipeThreshold || -dY < 2 * abs(dX)) return false;
+        mDeleteSwipeCandidate = false;
+        sTimerProxy.cancelKeyTimersOf(this);
+        setReleasedKeyGraphics(mCurrentKey, false);
+        sListener.onReleaseKey(KeyCode.DELETE, false);
+        if (mKeySwipeAllowed) {
+            mKeySwipeAllowed = false;
+            sInKeySwipe = false;
+        }
+        cancelTrackingForAction();
+        // SHIFT_ENTER insère toujours un saut de ligne (même là où Entrée enverrait le message)
+        sListener.onCodeInput(KeyCode.SHIFT_ENTER, Constants.NOT_A_COORDINATE, Constants.NOT_A_COORDINATE, false);
+        sListener.onCustomRequest(KeyboardActionListener.CustomAction.PERFORM_HAPTIC);
+        return true;
+    }
+
+    /** Appui long : en glissant (sans lever le doigt) sur une autre lettre, son panneau remplace le précédent. */
+    private boolean maybeSwitchPopupKey(final int x, final int y) {
+        final Key source = mPopupSourceKey;
+        if (source == null || !(mPopupKeysPanel instanceof PopupKeysKeyboardView)) return false;
+        final PopupKeysKeyboardView view = (PopupKeysKeyboardView) mPopupKeysPanel;
+        final Keyboard popupKeyboard = view.getKeyboard();
+        if (popupKeyboard == null) return false;
+        // doigt dans le panneau (ou au-dessus) : choix normal d'une variante
+        final int panelBottom = view.getPaddingTop() + popupKeyboard.mOccupiedHeight + sPopupSwitchMargin;
+        if (mPopupKeysPanel.translateY(y) < panelBottom) return false;
+        final Key key = mKeyDetector.detectHitKey(x, y);
+        if (key == null || key == source || !isFleksyEligible(key)
+                || key.getPopupKeys() == null || key.hasNoPanelAutoPopupKey()) return false;
+
+        dismissPopupKeysPanel();
+        mLastX = x;
+        mLastY = y;
+        mCurrentKey = key;
+        final PopupKeysPanel panel = sDrawingProxy.showPopupKeysKeyboard(key, this);
+        if (panel == null) {
+            mPopupSourceKey = null;
+            return false;
+        }
+        panel.onDownEvent(clampToPopupX(panel, panel.translateX(x)), clampToPopupY(panel, panel.translateY(y)),
+                mPointerId, SystemClock.uptimeMillis());
+        mPopupKeysPanel = panel;
+        mPopupSourceKey = key;
+        sListener.onCustomRequest(KeyboardActionListener.CustomAction.PERFORM_HAPTIC);
+        return true;
     }
 
     /** Façon Fleksy : pendant un appui long, le doigt peut glisser n'importe où (même sur d'autres lettres),
@@ -799,7 +859,9 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
         if (!mShiftSwipeCandidate) return false;
         final int dX = x - mStartX;
         final int dY = y - mStartY;
-        if (dX >= sFleksySwipeThreshold && dX > 2 * abs(dY)) {
+        final boolean right = dX >= sFleksySwipeThreshold && dX > 2 * abs(dY);
+        final boolean up = -dY >= sFleksySwipeThreshold && -dY > 2 * abs(dX);
+        if (right || up) {
             mShiftSwipeCandidate = false;
             sTimerProxy.cancelKeyTimersOf(this);
             final Key key = mCurrentKey;
@@ -808,10 +870,11 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
             sListener.onReleaseKey(KeyCode.SHIFT, true);
             sListener.onFinishSlidingInput();
             cancelTrackingForAction();
-            sListener.onCodeInput(KeyCode.EMOJI, Constants.NOT_A_COORDINATE, Constants.NOT_A_COORDINATE, false);
+            // haut : emojis ; droite : clavier des symboles (ceux de l'appui long sur les lettres)
+            sListener.onCodeInput(up ? KeyCode.EMOJI : KeyCode.SYMBOL, Constants.NOT_A_COORDINATE, Constants.NOT_A_COORDINATE, false);
             return true;
         }
-        // tant que ce n'est pas un glissement vers la droite, Maj reste simplement appuyée
+        // tant que ce n'est pas un glissement vers le haut ou la droite, Maj reste simplement appuyée
         mLastX = x;
         mLastY = y;
         return true;
@@ -970,6 +1033,9 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
         }
 
         if (isShowingPopupKeysPanel()) {
+            if (maybeSwitchPopupKey(x, y)) {
+                return;
+            }
             final int translatedX = clampToPopupX(mPopupKeysPanel, mPopupKeysPanel.translateX(x));
             final int translatedY = clampToPopupY(mPopupKeysPanel, mPopupKeysPanel.translateY(y));
             mPopupKeysPanel.onMoveEvent(translatedX, translatedY, mPointerId, eventTime);
@@ -1140,6 +1206,9 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
         final Key oldKey = mCurrentKey;
 
         if (handleShiftSwipeMove(x, y)) {
+            return;
+        }
+        if (handleDeleteSwipeUp(x, y)) {
             return;
         }
 
@@ -1360,6 +1429,7 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
         final int translatedY = popupKeysPanel.translateY(mLastY);
         popupKeysPanel.onDownEvent(translatedX, translatedY, mPointerId, SystemClock.uptimeMillis());
         mPopupKeysPanel = popupKeysPanel;
+        mPopupSourceKey = isFleksyEligible(key) ? key : null;
         if (mKeySwipeAllowed) {
             mKeySwipeAllowed = false;
             sInKeySwipe = false;
@@ -1386,6 +1456,8 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
 
     private void onCancelEventInternal() {
         mShiftSwipeCandidate = false;
+        mDeleteSwipeCandidate = false;
+        mPopupSourceKey = null;
         mFleksyEligible = false;
         mFleksyDirection = 0;
         sTimerProxy.cancelKeyTimersOf(this);
@@ -1508,6 +1580,7 @@ public final class PointerTracker implements PointerTrackerQueue.Element,
             return;
         }
         mCurrentRepeatingKeyCode = code;
+        mDeleteSwipeCandidate = false; // effacement en cours : plus de retour à la ligne par glissement
         if (mKeySwipeAllowed) {
             mKeySwipeAllowed = false;
             sInKeySwipe = false;

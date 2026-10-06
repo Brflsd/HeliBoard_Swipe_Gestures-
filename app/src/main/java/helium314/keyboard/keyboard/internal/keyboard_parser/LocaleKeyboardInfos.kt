@@ -61,6 +61,12 @@ class LocaleKeyboardInfos(dataStream: InputStream?, locale: Locale) {
             popupKeys["!"] = mutableListOf("¡")
         if (labelQuestion !in popupKeys)
             popupKeys[labelQuestion] = if (labelQuestion == "?") mutableListOf("¿") else mutableListOf("?", "¿")
+        // Fleksy : point et virgule par appui long sur « b » (toutes les langues), en premier
+        priorityPopupKeys.getOrPut("b") { mutableListOf() }.let { list ->
+            val withoutDuplicates = list.filterNot { it == labelPeriod || it == "\\," }
+            list.clear()
+            list.addAll(listOf(labelPeriod, "\\,") + withoutDuplicates)
+        }
         if ("punctuation" !in popupKeys)
             popupKeys["punctuation"] = mutableListOf("${Key.POPUP_KEYS_AUTO_COLUMN_ORDER}8", "\\,", "?", "!", "#", ")", "(", "/", ";", "'", "@", ":", "-", "\"", "+", "\\%", "&")
     }
