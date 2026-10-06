@@ -19,6 +19,13 @@ Vous utilisiez **Fleksy** et il n'est plus mis à jour depuis 2023 ? HeliFlick r
 
 ## Les gestes
 
+<p align="center">
+  <img src="docs/images/gestes-lettres.png" width="32%" alt="Gestes sur les lettres : espace, effacer le mot, suggestions, cacher la barre d'espace">
+  <img src="docs/images/gestes-touches.png" width="32%" alt="Gestes des touches Maj et effacer, pages de la barre d'outils">
+  <img src="docs/images/gestes-symboles-emojis.png" width="32%" alt="Symboles, raccourcis texte et emojis">
+</p>
+
+
 | Geste | Effet |
 |---|---|
 | Glisser **à droite** sur les lettres | Espace (deux fois : point) |
