@@ -1,0 +1,54 @@
+name: Récupérer les mises à jour de HeliBoard
+
+# Chaque mois, fusionne les nouveautés et correctifs de HeliBoard puis relance la compilation.
+# En cas de conflit, rien n'est modifié et une « issue » est ouverte pour le signaler.
+on:
+  schedule:
+    - cron: '17 3 1 * *'   # le 1er de chaque mois, 03:17 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: write
+  issues: write
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fusionner HeliBoard
+        id: merge
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add upstream https://github.com/HeliBorg/HeliBoard.git
+          git fetch upstream main
+          BEFORE=$(git rev-parse HEAD)
+          if ! git merge --no-edit upstream/main; then
+            git merge --abort
+            echo "conflict=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if [ "$(git rev-parse HEAD)" != "$BEFORE" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Pousser et recompiler
+        if: steps.merge.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git push origin HEAD:main
+          gh workflow run build-swipelibre.yml --ref main
+
+      - name: Signaler un conflit
+        if: steps.merge.outputs.conflict == 'true' || failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh issue create --title "Mise à jour HeliBoard à fusionner à la main" \
+            --body "La fusion automatique des nouveautés de HeliBoard a échoué (conflit ou fichiers de workflow modifiés). Elle doit être faite manuellement. Détails : ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"

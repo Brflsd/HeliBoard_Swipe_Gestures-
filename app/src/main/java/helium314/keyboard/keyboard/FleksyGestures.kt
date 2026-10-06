@@ -172,6 +172,11 @@ class FleksyGestures(
     private fun addToPersonalDictionary(word: String) {
         val trimmed = word.trim()
         if (trimmed.isEmpty()) return
+        // mode incognito (ou champ qui interdit l'apprentissage) : on n'enregistre rien
+        if (Settings.getValues().mIncognitoModeEnabled) {
+            KeyboardSwitcher.getInstance().showToast("Mode incognito : mot non enregistré", true)
+            return
+        }
         val locale = runCatching { RichInputMethodManager.getInstance().currentSubtypeLocale }.getOrNull()
         thread {
             // l'ajout peut échouer sur certains appareils sans dictionnaire personnel système

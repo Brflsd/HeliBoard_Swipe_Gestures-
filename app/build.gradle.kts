@@ -10,12 +10,14 @@ android {
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "helium314.keyboard"
+        // SwipeLibre : identifiant propre, s'installe à côté de HeliBoard
+        applicationId = "io.github.brflsd.swipelibre"
         minSdk = 21
         targetSdk = 37
-        versionCode = 4200
-        // numéro de compilation GitHub affiché dans « À propos » (ex. 4.2-beta1-fleksy3)
-        versionName = "4.2-beta1" + (project.findProperty("fleksyBuild")?.let { "-fleksy$it" } ?: "")
+        // numéro de compilation GitHub : version SwipeLibre 1.<n>, basée sur HeliBoard 4.2-beta1
+        val swipeLibreBuild = (project.findProperty("swipeLibreBuild") as String?)?.toIntOrNull() ?: 0
+        versionCode = 100000 + swipeLibreBuild
+        versionName = "1.$swipeLibreBuild (HeliBoard 4.2-beta1)"
         ndk {
             abiFilters.clear()
             abiFilters.addAll(listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64"))
@@ -23,15 +25,15 @@ android {
         proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
     }
 
-    // Clé de signature fixe du dépôt : chaque nouvelle APK s'installe par-dessus la précédente
-    val fleksyKeystore = rootProject.file(".github/signing/fleksy-debug.keystore")
+    // Clé de signature SwipeLibre : fournie par les secrets GitHub (jamais dans le dépôt)
+    val swipeLibreKeystore = System.getenv("SWIPELIBRE_KEYSTORE")?.let { file(it) }?.takeIf { it.exists() }
     signingConfigs {
-        if (fleksyKeystore.exists()) {
-            create("fleksy") {
-                storeFile = fleksyKeystore
-                storePassword = "android"
-                keyAlias = "androiddebugkey"
-                keyPassword = "android"
+        if (swipeLibreKeystore != null) {
+            create("swipelibre") {
+                storeFile = swipeLibreKeystore
+                storePassword = System.getenv("SWIPELIBRE_KEYSTORE_PASSWORD")
+                keyAlias = "swipelibre"
+                keyPassword = System.getenv("SWIPELIBRE_KEYSTORE_PASSWORD")
             }
         }
     }
@@ -42,6 +44,7 @@ android {
             isShrinkResources = false
             isDebuggable = false
             isJniDebuggable = false
+            if (swipeLibreKeystore != null) signingConfig = signingConfigs.getByName("swipelibre")
         }
         create("nouserlib") { // same as release, but does not allow the user to provide a library
             isMinifyEnabled = true
@@ -55,7 +58,6 @@ android {
             isMinifyEnabled = true
             isJniDebuggable = false
             applicationIdSuffix = ".debug"
-            if (fleksyKeystore.exists()) signingConfig = signingConfigs.getByName("fleksy")
         }
         create("runTests") { // build variant for running tests on CI that skips tests known to fail
             isMinifyEnabled = false
@@ -81,7 +83,7 @@ android {
             }
             variant.outputs.forEach { output ->
                 if (output is com.android.build.api.variant.impl.VariantOutputImpl) {
-                    output.outputFileName = "HeliBoard_${defaultConfig.versionName}-${variant.buildType}.apk"
+                    output.outputFileName = "SwipeLibre-${variant.buildType}.apk"
                 }
             }
         }

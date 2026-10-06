@@ -1,0 +1,83 @@
+name: Compiler et publier SwipeLibre
+
+# Compile l'APK signée à chaque modification de la branche principale (ou à la demande),
+# puis la publie comme « Release » GitHub : lien direct pour les utilisateurs.
+on:
+  push:
+    branches: [ main ]
+    paths-ignore: [ '**.md' ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-swipelibre
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # l'historique complet sert à numéroter les versions
+
+      - name: Installer Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - uses: gradle/actions/setup-gradle@v3
+
+      # La clé de signature vient des secrets du dépôt : elle n'est jamais publiée.
+      - name: Installer la clé de signature
+        env:
+          SIGNING_KEYSTORE_B64: ${{ secrets.SIGNING_KEYSTORE_B64 }}
+          SIGNING_PASSWORD: ${{ secrets.SIGNING_PASSWORD }}
+        run: |
+          if [ -z "$SIGNING_KEYSTORE_B64" ] || [ -z "$SIGNING_PASSWORD" ]; then
+            echo "::error::Secrets SIGNING_KEYSTORE_B64 et SIGNING_PASSWORD manquants (Settings → Secrets and variables → Actions)."
+            exit 1
+          fi
+          echo "$SIGNING_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/swipelibre.keystore"
+          echo "SWIPELIBRE_KEYSTORE=$RUNNER_TEMP/swipelibre.keystore" >> "$GITHUB_ENV"
+          echo "::add-mask::$SIGNING_PASSWORD"
+          echo "SWIPELIBRE_KEYSTORE_PASSWORD=$SIGNING_PASSWORD" >> "$GITHUB_ENV"
+
+      - name: Numéro de version
+        run: echo "BUILD_NUMBER=$(git rev-list --count HEAD)" >> "$GITHUB_ENV"
+
+      - name: Compiler
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease -PswipeLibreBuild=$BUILD_NUMBER
+
+      - name: Vérifier l'APK (signature, non déboguable)
+        run: |
+          APK=app/build/outputs/apk/release/SwipeLibre-release.apk
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          "$BT/apksigner" verify --print-certs "$APK" | grep -E "Signer #1 certificate (DN|SHA-256)"
+          if "$BT/aapt" dump badging "$APK" | grep -q "application-debuggable"; then
+            echo "::error::L'APK est déboguable"; exit 1
+          fi
+          "$BT/aapt" dump badging "$APK" | grep -E "^package:|application-label:"
+          cp "$APK" "SwipeLibre-1.$BUILD_NUMBER.apk"
+          rm -f "$RUNNER_TEMP/swipelibre.keystore"
+
+      - name: Publier la version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v1.$BUILD_NUMBER" "SwipeLibre-1.$BUILD_NUMBER.apk" \
+            --title "SwipeLibre 1.$BUILD_NUMBER" \
+            --notes "Compilée automatiquement depuis le commit ${GITHUB_SHA::7}. Installez le fichier .apk ci-dessous sur votre téléphone." \
+            --latest
+
+      - name: Rapports en cas d'échec
+        uses: actions/upload-artifact@v4
+        with:
+          name: rapports
+          path: '*/build/reports'
+        if: ${{ failure() }}
